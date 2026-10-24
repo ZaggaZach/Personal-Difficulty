@@ -1,0 +1,23 @@
+{
+	"schemaVersion": 1,
+	"id": "personaldifficulty",
+	"version": "${version}",
+	"name": "Personal Difficulty",
+	"description": "Let every player choose their own difficulty (Easy, Normal, Hard) on a shared server. Server-side only.",
+	"authors": ["ZaggaZach"],
+	"contact": {
+		"sources": "https://github.com/ZaggaZach/Personal-Difficulty"
+	},
+	"license": "MIT",
+	"environment": "server",
+	"entrypoints": {
+		"main": ["com.zaggazach.personaldifficulty.PersonalDifficulty"]
+	},
+	"mixins": ["personaldifficulty.mixins.json"],
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

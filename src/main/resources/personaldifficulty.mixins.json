@@ -1,0 +1,20 @@
+{
+	"required": true,
+	"package": "com.zaggazach.personaldifficulty.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"AbstractSkeletonAimMixin",
+		"CrossbowAimMixin",
+		"DrownedAimMixin",
+		"FoodDataMixin",
+		"IllusionerAimMixin",
+		"LivingEntityDamageMixin",
+		"PlayerExhaustionMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

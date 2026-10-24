@@ -1,0 +1,87 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+}
+
+fabricApi {
+	// In-server integration tests (real ServerPlayer / mobs / mixins): src/gametest, run with ./gradlew runGameTest
+	configureTests {
+		createSourceSet = true
+		modId = "personaldifficulty-gametest"
+		enableGameTests = true
+		eula = true
+		clearRunDirectory = true
+	}
+}
+
+loom {
+	mods {
+		"personaldifficulty" {
+			sourceSet sourceSets.main
+		}
+	}
+	runs {
+		// ./gradlew runServer: a real dedicated server in run/ (see docs/VERIFICATION.md)
+		server {
+			server()
+			runDir "run"
+		}
+		// JUnit-style XML for the in-server tests
+		gameTest {
+			property "fabric-api.gametest.report-file", layout.buildDirectory.file("reports/gametest/junit.xml").get().asFile.absolutePath
+		}
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	testImplementation platform("org.junit:junit-bom:5.11.4")
+	testImplementation "org.junit.jupiter:junit-jupiter"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+test {
+	useJUnitPlatform()
+	testLogging {
+		events "passed", "failed", "skipped"
+		exceptionFormat "full"
+	}
+}
+
+processResources {
+	def v = project.version
+	inputs.property "version", v
+	filesMatching("fabric.mod.json") {
+		expand "version": v
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+}
+
+java {
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+jar {
+	def projectName = project.name
+	inputs.property "projectName", projectName
+	from("LICENSE") {
+		rename { "${it}_$projectName" }
+	}
+}
