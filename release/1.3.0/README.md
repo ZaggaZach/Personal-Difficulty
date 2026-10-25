@@ -31,7 +31,7 @@ difficulties at the same time. Nobody installs anything on the client.
 ## Installation (Modrinth App / manual)
 
 1. Create or open a **Fabric 26.3** server instance.
-2. Put **Fabric API 0.165.0+26.3** and `personal-difficulty-1.1.0.jar` in the server's `mods` folder.
+2. Put **Fabric API 0.165.0+26.3** and `personal-difficulty-1.3.0.jar` in the server's `mods` folder.
 3. Start the server. The log shows
    `Personal Difficulty ready: N non-default player selection(s) loaded from ... selectable: [...]`.
 
