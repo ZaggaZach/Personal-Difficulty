@@ -10,8 +10,8 @@
 | Licence | MIT (SPDX `MIT`; `LICENSE` file in the repo confirms it) - licence URL: https://github.com/ZaggaZach/Personal-Difficulty/blob/main/LICENSE (adjust to the branch/tag that will exist) |
 | Source | https://github.com/ZaggaZach/Personal-Difficulty |
 | Issues | https://github.com/ZaggaZach/Personal-Difficulty/issues (enable Issues on the repo first) |
-| Categories (suggested, verify against Modrinth's current tag list) | featured: `game-mechanics`, `utility`; additional: `management`, `adventure` |
-| Environment | Server-side only (see "Decisions") |
+| Categories (verified to exist for project type `mod` in `api.modrinth.com/v2/tag/category`) | featured: `game-mechanics`, `mobs`; additional: `utility`, `management` (`adventure`, `multiplayer`... only if you prefer; `multiplayer` is listed for modpacks only) |
+| Environment | `dedicated_server_only` (a value listed by the current create-version API; the website's wording for it was not verifiable without logging in - if the form lacks it, use `server_only`) |
 | Icon / gallery | none exist yet - needs a decision |
 
 ## Version (to be created later)
@@ -19,10 +19,10 @@
 |---|---|
 | Version number | `1.3.0` |
 | Name | Personal Difficulty 1.3.0 - Elite is hunted |
-| Release channel (`version_type`) | `release` if you consider it final; `beta` is the cautious option because no real-client test record exists |
+| Release channel (`version_type`) | **`beta`** (owner's decision for the first Modrinth upload) |
 | Loaders | `fabric` only |
-| Game versions | `26.3` only (the only version built and tested; confirm Modrinth lists a `26.3` tag) |
-| Dependencies | Fabric API - `required` (project `fabric-api`; built with 0.165.0+26.3) |
+| Game versions | `26.3` only. **Verified:** Modrinth's game-version tag list contains `26.3` (type release, 2026-09-15). |
+| Dependencies | Fabric API - `required`. **Verified:** project id `P7dR8mSH`, slug `fabric-api`, type mod. Built/tested with 0.165.0+26.3. |
 | File | `release/1.3.0/personal-difficulty-1.3.0.jar` (SHA-256 `7d97ae9e6a733f0178fc12a99ed5d25d400159a5a9a0c59d123aa6647cdd8919`, 105,213 bytes). The sources jar may be attached as type `sources-jar`. |
 | Changelog | `docs/release/RELEASE_NOTES_1.3.0.md` |
 
@@ -58,6 +58,10 @@ supported; endermen, zombified piglins, piglins, hoglins, Warden and modded mobs
 - Mod not loading: check Java 25, Loader >= 0.20.1, Fabric API present, Minecraft exactly 26.3.
 - Elite too hard: lower `elite.effects.*-chance`, set `elite.priority.enabled=false` or `elite.effects.enabled=false`, then reload.
 - Invalid config values are clamped/defaulted and logged as `[config]` warnings.
+
+## Verified against the live Modrinth API on preparation day (read-only)
+- Game version `26.3` exists. Fabric API = `P7dR8mSH`. Categories above exist for mods. `https://api.modrinth.com/v2/project/personal-difficulty` returned 404, i.e. the slug appears unclaimed (a 404 cannot distinguish a private/draft project, so confirm in the UI).
+- Nothing was created or uploaded.
 
 ## Decisions needed from you
 1. **Environment value.** The mod declares `"environment": "server"` and does not load in single-player. Closest Modrinth value:
