@@ -1,0 +1,267 @@
+package com.zaggazach.personaldifficulty;
+
+import com.zaggazach.personaldifficulty.config.PdConfig;
+import com.zaggazach.personaldifficulty.logic.EliteSurvival;
+import com.zaggazach.personaldifficulty.logic.HuntingMob;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.WeakHashMap;
+import com.zaggazach.personaldifficulty.mixin.PathNavigationAccess;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.entity.monster.Enderman;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.monster.spider.Spider;
+import net.minecraft.world.entity.monster.zombie.ZombifiedPiglin;
+import net.minecraft.world.level.PathNavigationRegion;
+import net.minecraft.world.level.pathfinder.Path;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * Elite target priority (1.3.0): hostile mobs prefer an eligible Elite player over any other player.
+ *
+ * <p>Vanilla only re-runs target selection when a mob has no target (and hurt-by retaliation can swap it for whoever last hit
+ * it), so a mob that is busy with a Normal player would never notice an Elite one. Two cooperating pieces fix that:
+ * <ol>
+ * <li>{@link #huntTick}: every {@code scan-interval-ticks} (staggered by entity id) each participating mob re-evaluates; if it
+ *     is not already hunting an Elite player it takes the nearest eligible one.</li>
+ * <li>The nearest-player goal (see {@code NearestAttackableTargetGoalMixin}) prefers Elite candidates when it does run, and
+ *     refuses to start while the mob already holds a valid Elite target, so the goal cannot override the priority.</li>
+ * </ol>
+ * <b>Stability:</b> a mob that already hunts a valid Elite player is never re-targeted, so several Elite players cannot make
+ * a mob oscillate; it switches only when its Elite target is gone (dead, Peaceful, out of range, disconnected) and then picks
+ * the nearest remaining candidate (first in player-list order on exact ties).
+ * <b>No omniscience:</b> candidates must pass the mob's own {@link TargetingConditions} (line of sight, invisibility, head
+ * gear, {@code canAttack}) within a finite radius, with one narrow exception: for a few seconds after a mob last SAW its Elite
+ * target it may re-acquire that same player without line of sight, but only if its pathfinder finds a complete route to them
+ * within range (it walks around obstacles, never through them).
+ */
+public final class PdHunt {
+	private static final TargetingConditions SIGHT = TargetingConditions.forCombat();
+	private static final TargetingConditions BLIND = TargetingConditions.forCombat().ignoreLineOfSight();
+	private static final WeakHashMap<ServerLevel, Cached> CACHE = new WeakHashMap<>();
+
+	/** Valid for one game tick, one player count and one generation of mode selections (a switch invalidates it at once). */
+	private record Cached(long tick, int players, int generation, List<ServerPlayer> elites) {
+	}
+
+	private PdHunt() {
+	}
+
+	/** The Elite players of a level, rebuilt at most once per game tick (and only when some mob asks). */
+	static List<ServerPlayer> elites(ServerLevel level, PdRuntime rt) {
+		long now = level.getGameTime();
+		int generation = rt.settings().changeCount();
+		Cached cached = CACHE.get(level);
+		if (cached != null && cached.tick == now && cached.generation == generation && cached.players == level.players().size()) {
+			return cached.elites;
+		}
+		List<ServerPlayer> found = List.of();
+		for (ServerPlayer player : level.players()) {
+			if (player.isAlive() && !player.isSpectator() && rt.modeOf(player.getUUID()) == PersonalDifficultyMode.ELITE) {
+				if (found.isEmpty()) {
+					found = new ArrayList<>(2);
+				}
+				found.add(player);
+			}
+		}
+		CACHE.put(level, new Cached(now, level.players().size(), generation, found));
+		return found;
+	}
+
+	/** Hostile mobs with player-hunting goals take part; neutral or provoked-only families never do. */
+	static boolean participates(Mob mob) {
+		if (!(mob instanceof Monster) || mob instanceof Enderman || mob instanceof ZombifiedPiglin) {
+			return false;
+		}
+		return ((HuntingMob) mob).personaldifficulty$huntsPlayers();
+	}
+
+	static boolean isLiveEliteTarget(PdRuntime rt, @Nullable LivingEntity target) {
+		return target instanceof ServerPlayer p && p.isAlive() && rt.modeOf(p.getUUID()) == PersonalDifficultyMode.ELITE;
+	}
+
+	/** Called by the nearest-player goal: true if it must not start because the mob already holds an Elite target. */
+	public static boolean holdsEliteTarget(Mob mob) {
+		PdRuntime rt = PdRuntime.get();
+		return rt != null && rt.config().eliteHunt().priorityEnabled() && participates(mob) && isLiveEliteTarget(rt, mob.getTarget());
+	}
+
+	public static boolean priorityEnabled() {
+		PdRuntime rt = PdRuntime.get();
+		return rt != null && rt.config().eliteHunt().priorityEnabled();
+	}
+
+	/** Mob.serverAiStep hook. Cheap exit first: throttle, then family, then "is anyone Elite at all". */
+	public static void huntTick(Mob mob) {
+		PdRuntime rt = PdRuntime.get();
+		if (rt == null || !(mob.level() instanceof ServerLevel level) || !mob.isAlive()) {
+			return;
+		}
+		PdConfig.EliteHunt cfg = rt.config().eliteHunt();
+		if (!cfg.priorityEnabled() || (mob.tickCount + mob.getId()) % cfg.scanIntervalTicks() != 0 || !participates(mob)) {
+			return;
+		}
+		LivingEntity current = mob.getTarget();
+		HuntingMob memory = (HuntingMob) mob;
+		// A target that this class assigned has no vanilla goal watching over it, so the rules such a goal would enforce are
+		// enforced here: gone when dead, out of pursuit range, or unseen for longer than the (Elite-extended) memory.
+		if (current != null && current.getUUID().equals(memory.personaldifficulty$ownedTarget())) {
+			if (!stillValid(rt, mob, level, current, memory, cfg)) {
+				mob.setTarget(null);
+				memory.personaldifficulty$setOwnedTarget(null);
+				current = null;
+			}
+		} else if (isLiveEliteTarget(rt, current)) {
+			// An Elite target that someone else set (a vanilla goal that has since stopped, another mod) has no goal enforcing
+			// the keep-rules either; adopt it so that it can never be held forever.
+			memory.personaldifficulty$setOwnedTarget(current.getUUID());
+			memory.personaldifficulty$setUnseenTicks(0);
+		} else if (memory.personaldifficulty$ownedTarget() != null) {
+			memory.personaldifficulty$setOwnedTarget(null);
+		}
+		if (current != null && (!current.isAlive() || current.isRemoved())) {
+			mob.setTarget(null);
+			current = null;
+		}
+		List<ServerPlayer> elites = elites(level, rt);
+		if (elites.isEmpty()) {
+			return;
+		}
+		if (isLiveEliteTarget(rt, current)) {
+			ServerPlayer hunted = (ServerPlayer) current;
+			if (mob.getSensing().hasLineOfSight(hunted)) {
+				memory.personaldifficulty$rememberElite(hunted.getUUID(), level.getGameTime());
+			}
+			return; // stable: never swap one Elite target for another
+		}
+		// A daytime spider is neutral; forcing a target on it would make it drop the target again every few ticks.
+		if (mob instanceof Spider && mob.getLightLevelDependentMagicValue() >= 0.5F) {
+			return;
+		}
+		double range = EliteSurvival.cappedRange(mob.getAttributeValue(Attributes.FOLLOW_RANGE), rt.config().eliteAi().acquisitionRangeMultiplier());
+		ServerPlayer best = nearestVisible(level, mob, elites, range, SIGHT);
+		if (best == null) {
+			best = rememberedAndReachable(level, mob, memory, elites, range, cfg);
+		}
+		if (best != null && best != current) {
+			mob.setTarget(best);
+			memory.personaldifficulty$setOwnedTarget(best.getUUID());
+			memory.personaldifficulty$setUnseenTicks(0);
+		}
+	}
+
+	/** Vanilla's rules for keeping a target (alive, within range, not out of sight too long), with the Elite extensions. */
+	private static boolean stillValid(PdRuntime rt, Mob mob, ServerLevel level, LivingEntity target, HuntingMob memory, PdConfig.EliteHunt cfg) {
+		if (!target.isAlive() || target.isRemoved()) {
+			return false;
+		}
+		boolean elite = isLiveEliteTarget(rt, target);
+		if (mob.getSensing().hasLineOfSight(target)) {
+			memory.personaldifficulty$setUnseenTicks(0);
+			if (elite) {
+				memory.personaldifficulty$rememberElite(target.getUUID(), level.getGameTime());
+			}
+		} else {
+			memory.personaldifficulty$setUnseenTicks(memory.personaldifficulty$unseenTicks() + cfg.scanIntervalTicks());
+		}
+		PdConfig.EliteAi ai = rt.config().eliteAi();
+		double follow = mob.getAttributeValue(Attributes.FOLLOW_RANGE);
+		double range = elite ? EliteSurvival.cappedRange(follow, EliteSurvival.pursuitFactor(ai)) : follow;
+		int memoryTicks = elite && ai.improvedPursuit() ? EliteSurvival.memoryTicks(60, ai.targetMemoryMultiplier()) : 60;
+		return mob.distanceToSqr(target) <= range * range && memory.personaldifficulty$unseenTicks() <= memoryTicks;
+	}
+
+	/**
+	 * Nearest Elite player (first wins ties) that passes {@code conditions} within {@code range}. Shared by the periodic scan
+	 * and by the nearest-player goal.
+	 */
+	static @Nullable ServerPlayer nearestVisible(ServerLevel level, Mob mob, List<ServerPlayer> elites, double range, TargetingConditions conditions) {
+		conditions.range(range);
+		double limit = range * range;
+		ServerPlayer best = null;
+		double bestDistance = Double.MAX_VALUE;
+		for (ServerPlayer candidate : elites) {
+			double distance = mob.distanceToSqr(candidate.getX(), candidate.getEyeY(), candidate.getZ());
+			if (distance <= limit && distance < bestDistance && conditions.test(level, mob, candidate)) {
+				best = candidate;
+				bestDistance = distance;
+			}
+		}
+		return best;
+	}
+
+	private static @Nullable ServerPlayer rememberedAndReachable(
+		ServerLevel level, Mob mob, HuntingMob memory, List<ServerPlayer> elites, double range, PdConfig.EliteHunt cfg
+	) {
+		UUID id = memory.personaldifficulty$lastElite();
+		if (id == null || cfg.reacquireHiddenSeconds() <= 0
+			|| level.getGameTime() - memory.personaldifficulty$lastEliteSeen() > cfg.reacquireHiddenSeconds() * 20L) {
+			return null;
+		}
+		for (ServerPlayer candidate : elites) {
+			if (!candidate.getUUID().equals(id)) {
+				continue;
+			}
+			// BLIND skips only the line-of-sight test; range, invisibility, head gear and canAttack (Peaceful gate) still apply
+			if (nearestVisible(level, mob, List.of(candidate), range, BLIND) == null) {
+				return null;
+			}
+			return hasCompleteRoute(level, mob, candidate) ? candidate : null;
+		}
+		return null;
+	}
+
+	/**
+	 * A fresh, side-effect-free A* search with the mob's own pathfinder: true only if it reaches the target's block (so never
+	 * through solid blocks and never into a sealed room). Bounded by the mob's normal maximum path length and node budget.
+	 */
+	private static boolean hasCompleteRoute(ServerLevel level, Mob mob, ServerPlayer target) {
+		PathNavigationAccess access = (PathNavigationAccess) mob.getNavigation();
+		float maxLength = access.personaldifficulty$maxPathLength();
+		BlockPos from = mob.blockPosition().above();
+		int radius = (int) (maxLength + 16);
+		PathNavigationRegion region = new PathNavigationRegion(level, from.offset(-radius, -radius, -radius), from.offset(radius, radius, radius));
+		Path route = access.personaldifficulty$pathFinder().findPath(region, mob, Set.of(target.blockPosition()), maxLength, 0, access.personaldifficulty$maxVisitedNodesMultiplier());
+		return route != null && route.canReach();
+	}
+
+	/**
+	 * Result of the nearest-player goal's own search. With priority on, an eligible Elite player within the extended range
+	 * beats whatever ordinary player vanilla found; without priority the 1.2.0 behaviour applies (extended range only when
+	 * vanilla found nobody).
+	 */
+	public static @Nullable LivingEntity preferElite(Mob mob, TargetingConditions vanilla, double vanillaRange, @Nullable LivingEntity found) {
+		PdRuntime rt = PdRuntime.get();
+		if (rt == null || !(mob.level() instanceof ServerLevel level)) {
+			return found;
+		}
+		boolean priority = rt.config().eliteHunt().priorityEnabled() && participates(mob);
+		if (found != null && (!priority || isLiveEliteTarget(rt, found))) {
+			return found;
+		}
+		List<ServerPlayer> elites = elites(level, rt);
+		if (elites.isEmpty()) {
+			return found;
+		}
+		double extended = EliteSurvival.cappedRange(vanillaRange, rt.config().eliteAi().acquisitionRangeMultiplier());
+		if (extended <= vanillaRange && found != null) {
+			// range not widened: still allow an Elite player inside the plain range to win over an ordinary one
+			extended = vanillaRange;
+		}
+		ServerPlayer elite = nearestVisible(level, mob, elites, extended, copyFor(vanilla));
+		return elite != null ? elite : found;
+	}
+
+	/** The goal's own conditions (selector included) as a throw-away copy so the shared instance is never mutated. */
+	private static TargetingConditions copyFor(TargetingConditions vanilla) {
+		return vanilla.copy();
+	}
+}

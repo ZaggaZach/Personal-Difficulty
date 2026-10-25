@@ -1,5 +1,7 @@
 package com.zaggazach.personaldifficulty.gametest;
 
+import static com.zaggazach.personaldifficulty.gametest.PdTestSupport.*;
+
 import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -58,104 +60,6 @@ import net.minecraft.world.phys.Vec3;
  * so tests that run in the same batch cannot interleave, and shared config is restored in finally.
  */
 public class PdGameTests {
-	private static final float EPS = 1e-4F;
-
-	// ------------------------------------------------------------------ helpers
-
-	private static PdRuntime rt() {
-		PdRuntime rt = PdRuntime.get();
-		if (rt == null) {
-			throw new AssertionError("PdRuntime is not installed: SERVER_STARTING hook did not run");
-		}
-		return rt;
-	}
-
-	private static void check(boolean condition, String message) {
-		if (!condition) {
-			throw new AssertionError(message);
-		}
-	}
-
-	private static void near(float expected, float actual, String what) {
-		check(Math.abs(expected - actual) <= EPS * Math.max(1.0F, Math.abs(expected)), what + ": expected " + expected + " but was " + actual);
-	}
-
-	/** A real, placed, "client loaded", survival-mode ServerPlayer (mock players are otherwise invulnerable). */
-	private static ServerPlayer player(GameTestHelper h, String name, PersonalDifficultyMode mode) {
-		MinecraftServer server = h.getLevel().getServer();
-		GameProfile profile = new GameProfile(UUID.randomUUID(), name);
-		CommonListenerCookie cookie = CommonListenerCookie.createInitial(profile, false);
-		ServerPlayer p = new ServerPlayer(server, h.getLevel(), profile, ClientInformation.createDefault()) {
-			@Override
-			public GameType gameMode() {
-				return GameType.SURVIVAL;
-			}
-		};
-		Connection connection = new Connection(PacketFlow.SERVERBOUND);
-		new EmbeddedChannel(connection);
-		server.getPlayerList().placeNewPlayer(connection, p, cookie);
-		p.connection.handleAcceptPlayerLoad(new ServerboundPlayerLoadedPacket());
-		p.getAbilities().invulnerable = false;
-		Vec3 at = h.absoluteVec(new Vec3(6.5, 1.0, 2.5));
-		p.snapTo(at.x, at.y, at.z);
-		setMode(p, mode);
-		return p;
-	}
-
-	private static void setMode(ServerPlayer p, PersonalDifficultyMode mode) {
-		try {
-			rt().settings().set(p.getUUID(), mode);
-		} catch (java.io.IOException e) {
-			throw new AssertionError(e);
-		}
-	}
-
-	private static float lost(ServerPlayer p, DamageSource source, float amount) {
-		p.setHealth(20.0F);
-		p.setAbsorptionAmount(0.0F);
-		p.damageCooldownTime = 0;
-		p.hurtServer(p.level(), source, amount);
-		return 20.0F - p.getHealth();
-	}
-
-	private static float exhaustion(ServerPlayer p) {
-		try {
-			Field f = FoodData.class.getDeclaredField("exhaustionLevel");
-			f.setAccessible(true);
-			return f.getFloat(p.getFoodData());
-		} catch (ReflectiveOperationException e) {
-			throw new AssertionError(e);
-		}
-	}
-
-	private static void setExhaustion(ServerPlayer p, float v) {
-		try {
-			Field f = FoodData.class.getDeclaredField("exhaustionLevel");
-			f.setAccessible(true);
-			f.setFloat(p.getFoodData(), v);
-		} catch (ReflectiveOperationException e) {
-			throw new AssertionError(e);
-		}
-	}
-
-	private static void withConfig(String properties, Runnable body) {
-		PdRuntime rt = rt();
-		try {
-			Files.writeString(rt.configFile(), properties);
-			check(!rt.reload().readFailed(), "config reload failed");
-			body.run();
-		} catch (java.io.IOException e) {
-			throw new AssertionError(e);
-		} finally {
-			try {
-				Files.writeString(rt.configFile(), PdConfigLoader.defaultFileContents());
-			} catch (java.io.IOException ignored) {
-				// best effort; the run directory is disposable
-			}
-			rt.reload();
-		}
-	}
-
 	// ------------------------------------------------------------------ damage
 
 	@GameTest
@@ -164,12 +68,11 @@ public class PdGameTests {
 		var difficultyBefore = level.getDifficulty();
 		ServerPlayer easy = player(h, "pd_easy", PersonalDifficultyMode.EASY);
 		ServerPlayer normal = player(h, "pd_normal", PersonalDifficultyMode.NORMAL);
-		ServerPlayer inherit = player(h, "pd_inherit", PersonalDifficultyMode.INHERIT);
+		ServerPlayer elite = player(h, "pd_elite", PersonalDifficultyMode.ELITE);
 		ServerPlayer hard = player(h, "pd_hard", PersonalDifficultyMode.HARD);
 		for (DamageSource s : List.of(level.damageSources().fall(), level.damageSources().lava(), level.damageSources().inFire(), level.damageSources().drown(), level.damageSources().inWall())) {
 			near(6.0F, lost(easy, s, 10.0F), "easy " + s.getMsgId());
 			near(10.0F, lost(normal, s, 10.0F), "normal " + s.getMsgId());
-			near(10.0F, lost(inherit, s, 10.0F), "inherit " + s.getMsgId());
 			near(12.5F, lost(hard, s, 10.0F), "hard " + s.getMsgId());
 		}
 		// applied exactly once: 10 -> 6, never 3.6
@@ -302,15 +205,15 @@ public class PdGameTests {
 	public void hunger_exhaustionIsScaledPerMode(GameTestHelper h) {
 		ServerPlayer easy = player(h, "pd_hungry_easy", PersonalDifficultyMode.EASY);
 		ServerPlayer normal = player(h, "pd_hungry_normal", PersonalDifficultyMode.NORMAL);
-		ServerPlayer inherit = player(h, "pd_hungry_inherit", PersonalDifficultyMode.INHERIT);
+		ServerPlayer elite = player(h, "pd_hungry_elite", PersonalDifficultyMode.ELITE);
 		ServerPlayer hard = player(h, "pd_hungry_hard", PersonalDifficultyMode.HARD);
-		for (ServerPlayer p : List.of(easy, normal, inherit, hard)) {
+		for (ServerPlayer p : List.of(easy, normal, elite, hard)) {
 			setExhaustion(p, 0.0F);
 			p.causeFoodExhaustion(1.0F);
 		}
 		near(0.5F, exhaustion(easy), "easy hunger x0.5");
 		near(1.0F, exhaustion(normal), "normal hunger x1");
-		near(1.0F, exhaustion(inherit), "inherit hunger x1");
+		near(2.0F, exhaustion(elite), "elite hunger x2");
 		near(1.25F, exhaustion(hard), "hard hunger x1.25");
 		// fractional exhaustion is accumulated, not lost
 		setExhaustion(easy, 0.0F);
@@ -353,7 +256,7 @@ public class PdGameTests {
 
 	@GameTest
 	public void hunger_switchingModeNeverTouchesFoodState(GameTestHelper h) {
-		ServerPlayer p = player(h, "pd_switch", PersonalDifficultyMode.INHERIT);
+		ServerPlayer p = player(h, "pd_switch", PersonalDifficultyMode.NORMAL);
 		p.getFoodData().setFoodLevel(13);
 		p.getFoodData().setSaturation(2.5F);
 		setExhaustion(p, 1.3F);
@@ -367,70 +270,6 @@ public class PdGameTests {
 	}
 
 	// ------------------------------------------------------------------ ranged accuracy
-
-	private record Sample(double spread, double meanSpeed, double baseDamage, int shots) {
-	}
-
-	/** Fires {@code shots} projectiles and measures direction scatter (RMS of unit-vector deviation from the mean). */
-	private static Sample sample(ServerLevel level, Mob shooter, int shots, Runnable fire) {
-		List<Vec3> dirs = new ArrayList<>();
-		double speed = 0;
-		double damage = 0;
-		int arrows = 0;
-		for (int i = 0; i < shots; i++) {
-			fire.run();
-			List<Projectile> fired = level.getEntitiesOfClass(Projectile.class, shooter.getBoundingBox().inflate(3.0));
-			check(fired.size() == 1, "expected exactly one projectile per shot but saw " + fired.size());
-			Projectile p = fired.get(0);
-			Vec3 v = p.getDeltaMovement();
-			speed += v.length();
-			dirs.add(v.normalize());
-			if (p instanceof AbstractArrow a) {
-				damage += baseDamage(a);
-				arrows++;
-			}
-			p.discard();
-		}
-		Vec3 mean = Vec3.ZERO;
-		for (Vec3 d : dirs) {
-			mean = mean.add(d);
-		}
-		mean = mean.scale(1.0 / dirs.size());
-		double sq = 0;
-		for (Vec3 d : dirs) {
-			sq += d.subtract(mean).lengthSqr();
-		}
-		return new Sample(Math.sqrt(sq / dirs.size()), speed / shots, arrows == 0 ? Double.NaN : damage / arrows, shots);
-	}
-
-	private static void expectWider(String what, Sample easy, Sample normal, Sample nonPlayer, double vanillaUncertainty) {
-		double expectedEasy = Math.max(vanillaUncertainty, 14.0);
-		double expectedRatio = expectedEasy / vanillaUncertainty;
-		check(expectedRatio >= 1.5, "test would be vacuous: world difficulty gives vanilla uncertainty " + vanillaUncertainty);
-		double ratio = easy.spread() / normal.spread();
-		check(ratio > expectedRatio * 0.75 && ratio < expectedRatio * 1.25, what + ": easy/normal spread ratio " + ratio + " should be ~" + expectedRatio);
-		check(Math.abs(normal.spread() - nonPlayer.spread()) / nonPlayer.spread() < 0.12,
-			what + ": a Normal player must be shot at exactly like a non-player target (normal=" + normal.spread() + ", mob=" + nonPlayer.spread() + ")");
-		check(Math.abs(easy.meanSpeed() - normal.meanSpeed()) / normal.meanSpeed() < 0.03, what + ": projectile speed must not be substituted for aim");
-		if (!Double.isNaN(easy.baseDamage())) {
-			// vanilla randomises per-arrow damage (gaussian + difficulty term), so compare means
-			check(Math.abs(easy.baseDamage() - normal.baseDamage()) < 0.06, what + ": arrow damage must not be substituted for aim (" + easy.baseDamage() + " vs " + normal.baseDamage() + ")");
-		}
-	}
-
-	private static double baseDamage(AbstractArrow arrow) {
-		try {
-			Field f = AbstractArrow.class.getDeclaredField("baseDamage");
-			f.setAccessible(true);
-			return f.getDouble(arrow);
-		} catch (ReflectiveOperationException e) {
-			throw new AssertionError(e);
-		}
-	}
-
-	private static double vanillaUncertainty(ServerLevel level) {
-		return 14 - level.getDifficulty().getId() * 4;
-	}
 
 	@GameTest(maxTicks = 100)
 	public void ranged_skeletonAimIsWiderOnlyAgainstEasyPlayersAndFollowsTarget(GameTestHelper h) {
@@ -534,56 +373,11 @@ public class PdGameTests {
 
 	// ------------------------------------------------------------------ commands & permissions
 
-	private static final class Capture implements CommandSource {
-		final List<String> messages = new ArrayList<>();
-
-		@Override
-		public void sendSystemMessage(Component message) {
-			messages.add(message.getString());
-		}
-
-		@Override
-		public boolean acceptsSuccess() {
-			return true;
-		}
-
-		@Override
-		public boolean acceptsFailure() {
-			return true;
-		}
-
-		@Override
-		public boolean shouldInformAdmins() {
-			return false;
-		}
-
-		String all() {
-			return String.join("\n", messages);
-		}
-	}
-
-	private record Outcome(int result, String error, String output) {
-	}
-
-	private static Outcome run(MinecraftServer server, String command, CommandSourceStack source, Capture cap) {
-		CommandDispatcher<CommandSourceStack> d = server.getCommands().getDispatcher();
-		try {
-			int r = d.execute(command, source);
-			return new Outcome(r, null, cap.all());
-		} catch (CommandSyntaxException e) {
-			return new Outcome(0, e.getMessage(), cap.all());
-		}
-	}
-
-	private static CommandSourceStack as(ServerPlayer p, PermissionSet permissions, Capture cap) {
-		return p.createCommandSourceStack().withSource(cap).withPermission(permissions);
-	}
-
 	@GameTest
 	public void commands_selfServiceOnlyTouchesTheCaller(GameTestHelper h) {
 		MinecraftServer server = h.getLevel().getServer();
 		var difficultyBefore = server.getWorldData().getDifficulty();
-		ServerPlayer alice = player(h, "pd_alice", PersonalDifficultyMode.INHERIT);
+		ServerPlayer alice = player(h, "pd_alice", PersonalDifficultyMode.NORMAL);
 		ServerPlayer bob = player(h, "pd_bob", PersonalDifficultyMode.HARD);
 		Capture cap = new Capture();
 		CommandSourceStack asAlice = as(alice, PermissionSet.NO_PERMISSIONS, cap);
@@ -599,9 +393,10 @@ public class PdGameTests {
 		check(cap.all().contains("EASY") && cap.all().contains("World difficulty"), "status shows mode and world difficulty: " + cap.all());
 
 		run(server, "personaldifficulty normal", asAlice, cap);
-		check(rt().modeOf(alice.getUUID()) == PersonalDifficultyMode.NORMAL, "explicit NORMAL stored");
-		run(server, "personaldifficulty inherit", asAlice, cap);
-		check(rt().modeOf(alice.getUUID()) == PersonalDifficultyMode.INHERIT, "inherit resets");
+		check(rt().modeOf(alice.getUUID()) == PersonalDifficultyMode.NORMAL, "NORMAL selected");
+		Outcome inherit = run(server, "personaldifficulty inherit", asAlice, cap);
+		check(inherit.result() == 0 && inherit.output().contains("removed in 1.1.0"), "inherit no longer exists and says so: " + inherit);
+		check(rt().modeOf(alice.getUUID()) == PersonalDifficultyMode.NORMAL, "a rejected command changes nothing");
 		run(server, "personaldifficulty hard", asAlice, cap);
 		check(rt().modeOf(alice.getUUID()) == PersonalDifficultyMode.HARD, "hard stored");
 
@@ -616,7 +411,7 @@ public class PdGameTests {
 	@GameTest
 	public void commands_adminOperationsRequireOpAndConsoleWorks(GameTestHelper h) {
 		MinecraftServer server = h.getLevel().getServer();
-		ServerPlayer op = player(h, "pd_op", PersonalDifficultyMode.INHERIT);
+		ServerPlayer op = player(h, "pd_op", PersonalDifficultyMode.NORMAL);
 		ServerPlayer victim = player(h, "pd_victim", PersonalDifficultyMode.EASY);
 		Capture cap = new Capture();
 
@@ -625,7 +420,7 @@ public class PdGameTests {
 		check(rt().modeOf(victim.getUUID()) == PersonalDifficultyMode.EASY, "inspect does not modify");
 		Outcome reset = run(server, "personaldifficulty admin reset pd_victim", as(op, LevelBasedPermissionSet.GAMEMASTER, cap), cap);
 		check(reset.error() == null, "op can reset: " + reset);
-		check(rt().modeOf(victim.getUUID()) == PersonalDifficultyMode.INHERIT, "victim reset to INHERIT");
+		check(rt().modeOf(victim.getUUID()) == PersonalDifficultyMode.NORMAL, "victim reset to NORMAL");
 
 		check(run(server, "personaldifficulty admin reset pd_op", as(op, LevelBasedPermissionSet.ALL, cap), cap).error() != null, "permission level 0 is rejected");
 		Outcome unknown = run(server, "personaldifficulty admin reset nobody_here", as(op, LevelBasedPermissionSet.GAMEMASTER, cap), cap);
@@ -644,19 +439,29 @@ public class PdGameTests {
 	}
 
 	@GameTest
-	public void commands_treeAndTabCompletion(GameTestHelper h) {
+	public void commands_treeShapeAndSuggestions(GameTestHelper h) throws Exception {
 		MinecraftServer server = h.getLevel().getServer();
-		ServerPlayer p = player(h, "pd_tab", PersonalDifficultyMode.INHERIT);
+		ServerPlayer p = player(h, "pd_tab", PersonalDifficultyMode.NORMAL);
 		Capture cap = new Capture();
-		CommandNode<CommandSourceStack> root = server.getCommands().getDispatcher().getRoot().getChild("personaldifficulty");
+		var dispatcher = server.getCommands().getDispatcher();
+		CommandNode<CommandSourceStack> root = dispatcher.getRoot().getChild("personaldifficulty");
 		check(root != null, "command registered");
 		CommandSourceStack plain = as(p, PermissionSet.NO_PERMISSIONS, cap);
 		CommandSourceStack op = as(p, LevelBasedPermissionSet.GAMEMASTER, cap);
 		List<String> forPlayer = root.getChildren().stream().filter(c -> c.canUse(plain)).map(CommandNode::getName).sorted().toList();
 		List<String> forOp = root.getChildren().stream().filter(c -> c.canUse(op)).map(CommandNode::getName).sorted().toList();
-		check(forPlayer.equals(List.of("easy", "hard", "inherit", "normal", "status")), "player-visible subcommands: " + forPlayer);
-		check(forOp.equals(List.of("admin", "easy", "hard", "inherit", "normal", "status")), "op-visible subcommands: " + forOp);
-		check(server.getCommands().getDispatcher().getRoot().getChild("difficulty") != null, "vanilla /difficulty still exists (no conflict)");
+		check(forPlayer.equals(List.of("difficulty", "status")), "player-visible nodes: " + forPlayer);
+		check(forOp.equals(List.of("admin", "difficulty", "status")), "op-visible nodes: " + forOp);
+		List<String> adminChildren = root.getChild("admin").getChildren().stream().map(CommandNode::getName).sorted().toList();
+		check(adminChildren.equals(List.of("config", "difficulties", "disable", "enable", "reload", "reset", "status")), "admin subcommands: " + adminChildren);
+
+		var suggestions = dispatcher.getCompletionSuggestions(dispatcher.parse("personaldifficulty ", plain)).get();
+		List<String> offered = suggestions.getList().stream().map(s -> s.getText()).sorted().toList();
+		for (String m : List.of("easy", "elite", "hard", "normal", "peaceful")) {
+			check(offered.contains(m), m + " is suggested when enabled: " + offered);
+		}
+		check(!offered.contains("inherit"), "inherit is not suggested: " + offered);
+		check(dispatcher.getRoot().getChild("difficulty") != null, "vanilla /difficulty still exists (no conflict)");
 		h.succeed();
 	}
 
@@ -677,7 +482,7 @@ public class PdGameTests {
 			Files.delete(rt().configFile());
 			cap.messages.clear();
 			Outcome bad = run(server, "personaldifficulty admin reload", src, cap);
-			check(bad.result() == 0 && cap.all().contains("NOT reloaded"), "unreadable file reported: " + cap.all());
+			check(bad.result() == 0 && cap.all().contains("Reload incomplete") && cap.all().contains("previous values stay in force"), "unreadable file reported: " + cap.all());
 			near(5.0F, lost(op, level.damageSources().fall(), 10.0F), "previous config kept after failed reload");
 		} catch (java.io.IOException e) {
 			throw new AssertionError(e);

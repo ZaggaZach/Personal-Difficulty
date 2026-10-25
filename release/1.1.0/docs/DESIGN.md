@@ -1,0 +1,118 @@
+# Design notes (verified against the Minecraft 26.3 sources)
+
+Source facts below were read from the decompiled 26.3 jar (Loom `genSources`), not from memory.
+
+## Damage pipeline and where the hooks sit
+
+```
+ServerPlayer.hurtServer
+  Fabric ALLOW_DAMAGE ........ PEACEFUL: cancel here (victim Peaceful, or responsible player Peaceful)   <- this mod
+  Player.hurtServer .......... world difficulty scaling for scalesWithDifficulty() sources
+                               (Easy: min(d/2+1, d); Hard: d*1.5; Peaceful world: 0)                  <- vanilla, untouched
+    LivingEntity.hurtServer .. shield blocking, helmet, i-frame check on RAW damage                      <- vanilla, untouched
+      Player.actuallyHurt
+        getDamageAfterArmorAbsorb ...... ELITE: armour only 60 % as effective                           <- this mod (@WrapMethod)
+        getDamageAfterMagicAbsorb ...... resistance effect, then protection enchantments (vanilla)
+          └── RETURN hook: profile multiplier (Easy 0.6 / Hard 1.25 / Elite 2.0), exactly once          <- this mod
+        absorption hearts, then health, food exhaustion from damage, death
+```
+
+* **One multiplier, one place.** The profile factor is applied to the result of the last vanilla mitigation step, so it is
+  an exact fraction of what vanilla would deal, i-frames (compared on raw damage earlier) are untouched, shields/totems/
+  death run outside the hooks, and a factor >= 0 can never heal or revive.
+* **No double application of the world difficulty.** The world's scaling happens earlier (`Player.hurtServer`) and is part of
+  the number the hooks receive. The mod never reads the world difficulty to compute damage. Verified in Easy, Normal and Hard
+  test worlds: Hard player = exactly 1.25x what a Normal player loses *in that world*.
+* **Why mixins:** Fabric API's `ServerLivingEntityEvents` can cancel (`ALLOW_DAMAGE`) or observe (`AFTER_DAMAGE`) damage but
+  cannot change its amount, so amounts need `@ModifyReturnValue`/`@WrapMethod`. Peaceful's cancellation uses the public
+  `ALLOW_DAMAGE` event, no mixin.
+* **A bug worth recording:** the armour hook was first written as a `RETURN` injection reading the method's `damage`
+  parameter as "the original". Vanilla reassigns that parameter, so at `RETURN` it already held the post-armour value and
+  Elite silently got a bare x2. Pure-function unit tests passed; the in-server armour-tier test (expected 4.056, saw 2.76)
+  caught it. The hook is now `@WrapMethod`, which receives the true arguments.
+
+Precedence for choosing the factor: void -> administrative -> self-inflicted -> other player (PvP) -> per-damage-type
+override -> environmental gate -> profile multiplier. Exceptions that leave damage untouched also skip Elite's armour weakening.
+
+## Elite: why an armour mechanic and not a bigger number
+
+Computed from vanilla `CombatRules` (and re-checked in game by `EliteGameTests`). Damage to health from one hit, raw damage
+into the armour step = 4.5 (a zombie's 3.0 on a Hard world); k = armour effectiveness, m = final multiplier:
+
+| Armour | vanilla | Hard x1.25 | Elite m=2, k=1.0 (bare x2) | **Elite m=2, k=0.6 (shipped)** |
+|---|---|---|---|---|
+| none | 4.50 | 5.62 | 9.00 | **9.00** |
+| iron | 2.21 | 2.76 | 4.41 | **6.25** |
+| diamond | 1.10 | 1.38 | 2.21 | **4.92** |
+| diamond + Prot IV | 0.40 | 0.50 | 0.79 | **1.77** |
+| netherite + Prot IV | 0.38 | 0.48 | 0.76 | **1.75** |
+
+With a bare multiplier (k = 1.0) fully enchanted netherite makes Elite trivial (0.76 HP per zombie hit, 1.3 per arrow).
+Weakening only the armour step keeps Protection and Resistance fully effective (preparation still pays), cannot reduce
+damage below what the unarmoured hit would be, never bypasses armour entirely, and never produces an unavoidable kill.
+At k = 0.6 a fully enchanted netherite player takes ~4.8x vanilla and survives ~11-17 zombie hits but only 2-3 hits from a
+heavy hitter (a Hard vindicator, raw 19.5, deals ~8.6); unarmoured and iron players die in 3-5 hits. These are design
+estimates for the stated defaults, **not a play-tested balance**; every value is configurable.
+
+In-game table (Normal-difficulty test world, raw 3.0, 20 HP):
+
+| Armour | Normal | Hard | Elite | Elite hits to die |
+|---|---|---|---|---|
+| none | 3.000 | 3.750 | 6.000 | 3.3 |
+| iron | 1.380 | 1.725 | 4.056 | 4.9 |
+| diamond | 0.690 | 0.862 | 3.228 | 6.2 |
+| netherite | 0.672 | 0.840 | 3.206 | 6.2 |
+| diamond + Prot IV | 0.248 | 0.310 | 1.162 | 17.2 |
+| netherite + Prot IV | 0.242 | 0.302 | 1.154 | 17.3 |
+
+**Elite hunger:** exhaustion x2.0 at the source (jump, sprint-jump, melee, block break and damage taken measured exactly 2x;
+100 sprint-jumps from full food with no saturation cost Normal 5, Hard 6, Elite 10 food points). Food and saturation are never
+edited; vanilla regeneration rules are untouched.
+
+**Elite aim:** `Projectile.shoot` adds `triangle(0, 0.0172275 * uncertainty)` per axis, so spread is linear in the uncertainty.
+Elite uses `min(vanilla, 1.0)` (never loosens), Easy `max(vanilla, 14)` (never tightens). Hooks sit at the call that has the
+target in scope; nothing is stored on the mob; projectile speed and damage are not touched (checked). Witch uses a
+hard-coded vanilla uncertainty of 8. Piglins are brain-driven: `getTarget()` is empty during their crossbow shot, so
+`PiglinAimMixin` exposes the brain target through a `ThreadLocal` for the duration of that one call only.
+
+## Peaceful
+
+* **Damage:** `ALLOW_DAMAGE` returns false before any vanilla processing when the victim is a Peaceful player, or when the
+  responsible player (resolved through projectile owner, area-effect-cloud owner, TNT owner or tamed animal owner, a few
+  levels deep) is Peaceful and the victim is a different player. Exempt: damage tagged `bypasses_invulnerability` (the void
+  and `/kill`). All 51 registered damage types were enumerated in game: 49 blocked, exactly those 2 bypass.
+* **Targeting:** `LivingEntity.canAttack` is the gate every goal (`TargetingConditions`) and brain sensor uses and is
+  re-evaluated continuously, so a cleared target cannot restart. `Warden` and `EnderDragon` override it without `super`
+  and get their own hooks; `Mob.setTarget` turns a direct request into `null` as a backstop. Only the Peaceful player is
+  affected; others are targeted exactly as before.
+* **Hunger:** `causeFoodExhaustion` and the regeneration cost return 0 for Peaceful; exhaustion banked earlier is capped at
+  4.0 inside `FoodData.tick` so it can never turn into food loss. Starvation damage is cancelled by the damage rule.
+  Regeneration rules are vanilla; because healing costs Peaceful no saturation, saturation is not spent, so a Peaceful
+  player keeps healing at the top rate longer than a vanilla player (measured 13.3 vs 12.5 HP after 40 ticks from 10 HP).
+* **Effects:** `addEffect(effect, source)` refuses harmful effects for a Peaceful victim and, by attribution, for any
+  player victim when the source's player is Peaceful. On entering Peaceful, harmful effects and fire are removed.
+* **Policy for exceptional cases:** void and `/kill` still work (no administrative immunity); `/damage` with an ordinary
+  type is blocked like any damage; `/effect` of a harmful effect on a Peaceful player is refused.
+* **Not attributable, therefore not blocked** (when the victim is not Peaceful): dispensers, lava/fire placed earlier,
+  unowned TNT, lightning, falling blocks, pistons. A Peaceful *victim* is always safe.
+
+## Availability policy
+
+Separate file, separate class (`AvailabilityPolicy`), never touches `PlayerSettings`. It stores the *disabled* set, so an
+absent file or a mode added later is enabled by default. Safeguards: the last enabled mode cannot be disabled; a file that
+disables all five is invalid (all enabled, original backed up); a failed write rolls back; `admin enable all` always
+recovers. The self-service difficulty is a validated Brigadier word argument with a live suggestion provider; the
+permission-gated `admin` literal is enforced by the parser, so it cannot be bypassed through other command sources.
+
+## Player data and migration
+
+See README "Migration from 1.0.0". The format is unchanged, so migration is a tolerant read, not a rewrite. Unknown entries
+are kept verbatim; unreadable files are copied to `*.backup-<time>` before anything is overwritten.
+
+## State and failure behaviour
+
+* `PdRuntime` is one volatile reference installed in `SERVER_STARTING`, cleared in `SERVER_STOPPED`; hooks return vanilla
+  values outside that window. The only other mutable static is the `ThreadLocal` used by the piglin hook, scoped to a call.
+* Config: immutable record swapped on reload. Selections: `ConcurrentHashMap<UUID, Mode>`, written atomically only on change.
+* `mixins.json` uses `defaultRequire: 1`: if a target changes in a future Minecraft version the server fails loudly at
+  startup instead of silently losing a feature (13 mixins).

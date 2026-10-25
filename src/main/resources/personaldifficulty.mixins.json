@@ -3,13 +3,27 @@
 	"package": "com.zaggazach.personaldifficulty.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
+		"AbstractSkeletonAccess",
 		"AbstractSkeletonAimMixin",
 		"CrossbowAimMixin",
 		"DrownedAimMixin",
+		"EnderDragonTargetMixin",
 		"FoodDataMixin",
 		"IllusionerAimMixin",
 		"LivingEntityDamageMixin",
-		"PlayerExhaustionMixin"
+		"LivingEntityPeacefulMixin",
+		"MeleeAttackGoalMixin",
+		"MobHuntMixin",
+		"MobTargetMixin",
+		"NearestAttackableTargetGoalMixin",
+		"PathNavigationAccess",
+		"PathNavigationMixin",
+		"PiglinAimMixin",
+		"PlayerExhaustionMixin",
+		"RangedBowAttackGoalMixin",
+		"TargetGoalMixin",
+		"WardenTargetMixin",
+		"WitchAimMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

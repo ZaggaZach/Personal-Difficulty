@@ -18,7 +18,7 @@ class PlayerSettingsTest {
 	void newPlayerDefaultsToInherit(@TempDir Path dir) {
 		PlayerSettings s = new PlayerSettings(dir.resolve("p.json"));
 		s.load();
-		assertEquals(PersonalDifficultyMode.INHERIT, s.get(A));
+		assertEquals(PersonalDifficultyMode.NORMAL, s.get(A));
 	}
 
 	@Test
@@ -35,20 +35,20 @@ class PlayerSettingsTest {
 		PlayerSettings restarted = new PlayerSettings(f); // fresh instance = server restart
 		restarted.load();
 		assertEquals(PersonalDifficultyMode.HARD, restarted.get(A));
-		assertEquals(PersonalDifficultyMode.NORMAL, restarted.get(B), "explicit NORMAL is stored, distinct from INHERIT");
+		assertEquals(PersonalDifficultyMode.NORMAL, restarted.get(B), "NORMAL is the default; no entry needed");
 		assertTrue(restarted.loadWarnings().isEmpty());
 	}
 
 	@Test
-	void inheritRemovesTheEntryAndOthersSurvive(@TempDir Path dir) throws IOException {
+	void settingNormalRemovesTheEntryAndOthersSurvive(@TempDir Path dir) throws IOException {
 		Path f = dir.resolve("p.json");
 		PlayerSettings s = new PlayerSettings(f);
 		s.set(A, PersonalDifficultyMode.EASY);
 		s.set(B, PersonalDifficultyMode.HARD);
-		s.set(A, PersonalDifficultyMode.INHERIT);
+		s.set(A, PersonalDifficultyMode.NORMAL);
 		PlayerSettings r = new PlayerSettings(f);
 		r.load();
-		assertEquals(PersonalDifficultyMode.INHERIT, r.get(A));
+		assertEquals(PersonalDifficultyMode.NORMAL, r.get(A));
 		assertEquals(PersonalDifficultyMode.HARD, r.get(B));
 		assertEquals(1, r.explicitCount());
 	}
@@ -68,10 +68,10 @@ class PlayerSettingsTest {
 		Files.writeString(f, "{ this is not json");
 		PlayerSettings s = new PlayerSettings(f);
 		s.load();
-		assertEquals(PersonalDifficultyMode.INHERIT, s.get(A));
+		assertEquals(PersonalDifficultyMode.NORMAL, s.get(A));
 		assertFalse(s.loadWarnings().isEmpty());
 		try (var files = Files.list(dir)) {
-			assertTrue(files.anyMatch(p -> p.getFileName().toString().contains(".corrupt-")), "original preserved");
+			assertTrue(files.anyMatch(p -> p.getFileName().toString().contains(".backup-")), "original preserved");
 		}
 	}
 
@@ -82,7 +82,7 @@ class PlayerSettingsTest {
 		PlayerSettings s = new PlayerSettings(f);
 		s.load();
 		assertEquals(PersonalDifficultyMode.EASY, s.get(A));
-		assertEquals(PersonalDifficultyMode.INHERIT, s.get(B));
+		assertEquals(PersonalDifficultyMode.NORMAL, s.get(B));
 		assertEquals(2, s.loadWarnings().size());
 	}
 
@@ -92,7 +92,7 @@ class PlayerSettingsTest {
 		Files.writeString(blocker, "i am a file, not a directory");
 		PlayerSettings s = new PlayerSettings(blocker.resolve("p.json"));
 		assertThrows(IOException.class, () -> s.set(A, PersonalDifficultyMode.EASY));
-		assertEquals(PersonalDifficultyMode.INHERIT, s.get(A));
+		assertEquals(PersonalDifficultyMode.NORMAL, s.get(A));
 	}
 
 	@Test
@@ -101,6 +101,6 @@ class PlayerSettingsTest {
 		PlayerSettings w2 = new PlayerSettings(dir.resolve("world2/p.json"));
 		w1.set(A, PersonalDifficultyMode.EASY);
 		w2.load();
-		assertEquals(PersonalDifficultyMode.INHERIT, w2.get(A));
+		assertEquals(PersonalDifficultyMode.NORMAL, w2.get(A));
 	}
 }

@@ -3,7 +3,7 @@
 	"id": "personaldifficulty",
 	"version": "${version}",
 	"name": "Personal Difficulty",
-	"description": "Let every player choose their own difficulty (Easy, Normal, Hard) on a shared server. Server-side only.",
+	"description": "Let every player choose their own difficulty (Normal, Easy, Hard, Elite, Peaceful) on a shared server. Server-side only.",
 	"authors": ["ZaggaZach"],
 	"contact": {
 		"sources": "https://github.com/ZaggaZach/Personal-Difficulty"
