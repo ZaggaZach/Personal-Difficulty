@@ -199,9 +199,9 @@ public final class PdCommands {
 				c.hard().damageMultiplier(), c.hard().hungerMultiplier(),
 				c.pvpDamageMultiplier(), c.selfDamageMultiplier(), applied(c.voidApplyProfile()), applied(c.adminApplyProfile()), applied(c.environmentalApplyProfile()));
 			case ELITE -> String.format(Locale.ROOT,
-				"Armour is only %.0f%% as effective, then incoming damage x%.2f (after resistance/enchantments, before absorption; each applied once), hunger x%.2f, supported ranged attackers aim with at most uncertainty %.2f, natural regeneration at x%.2f speed (Regeneration, healing and absorption unchanged). Hostile mobs hunting you: %s. PvP x%.2f, self x%.2f, void %s, admin %s, environmental %s.",
+				"Armour is only %.0f%% as effective, then incoming damage x%.2f (after resistance/enchantments, before absorption; each applied once), hunger x%.2f, supported ranged attackers aim with at most uncertainty %.2f, natural regeneration at x%.2f speed (Regeneration, healing and absorption unchanged). Hostile mobs hunting you: %s. %s. PvP x%.2f, self x%.2f, void %s, admin %s, environmental %s.",
 				c.eliteArmorEffectiveness() * 100, c.elite().damageMultiplier(), c.elite().hungerMultiplier(), c.eliteRangedMaxUncertainty(),
-				c.eliteRegenMultiplier(), describeEliteAi(c.eliteAi()),
+				c.eliteRegenMultiplier(), describeEliteAi(c.eliteAi()), describeEliteHunt(c),
 				c.pvpDamageMultiplier(), c.selfDamageMultiplier(), applied(c.voidApplyProfile()), applied(c.adminApplyProfile()), applied(c.environmentalApplyProfile()));
 			case PEACEFUL -> "You take no damage except from the void and /kill, hostile mobs will not target you, you lose no hunger, harmful effects are blocked, and you cannot damage other players (nor they you).";
 		};
@@ -215,6 +215,23 @@ public final class PdCommands {
 		}
 		if (ai.advancedCombat()) {
 			sb.append(", skeleton-family archers shoot at the Hard rate");
+		}
+		return sb.toString();
+	}
+
+	private static String describeEliteHunt(PdConfig c) {
+		PdConfig.EliteHunt hunt = c.eliteHunt();
+		PdConfig.EliteEffects fx = c.eliteEffects();
+		StringBuilder sb = new StringBuilder();
+		sb.append(hunt.priorityEnabled()
+			? "Hostile mobs prefer you over other players (re-checked every " + hunt.scanIntervalTicks() + " ticks"
+				+ (hunt.reacquireHiddenSeconds() > 0 ? ", hidden targets re-acquired for " + hunt.reacquireHiddenSeconds() + " s when a route exists" : "") + ")"
+			: "Hostile mobs do not prefer you over other players");
+		if (fx.enabled()) {
+			sb.append(String.format(Locale.ROOT, ". Hits can infect/slow you: zombie %.0f%%, spider %.0f%%, cave spider %.0f%%, skeleton arrow %.0f%%, drowned %.0f%% (max %d s)",
+				fx.zombie().chance() * 100, fx.spider().chance() * 100, fx.caveSpider().chance() * 100, fx.skeleton().chance() * 100, fx.drowned().chance() * 100, fx.maxDurationSeconds()));
+		} else {
+			sb.append(". Mob hit effects are off");
 		}
 		return sb.toString();
 	}

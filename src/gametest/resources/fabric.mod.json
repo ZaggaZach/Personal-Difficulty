@@ -1,7 +1,7 @@
 {
 	"schemaVersion": 1,
 	"id": "personaldifficulty-gametest",
-	"version": "1.2.0",
+	"version": "1.3.0",
 	"name": "Personal Difficulty GameTests",
 	"description": "In-server integration tests for Personal Difficulty (never shipped).",
 	"environment": "server",
@@ -13,7 +13,9 @@
 			"com.zaggazach.personaldifficulty.gametest.PeacefulGameTests",
 			"com.zaggazach.personaldifficulty.gametest.PeacefulAiGameTests",
 			"com.zaggazach.personaldifficulty.gametest.EliteRegenGameTests",
-			"com.zaggazach.personaldifficulty.gametest.EliteAiGameTests"
+			"com.zaggazach.personaldifficulty.gametest.EliteAiGameTests",
+			"com.zaggazach.personaldifficulty.gametest.EliteHuntGameTests",
+			"com.zaggazach.personaldifficulty.gametest.EliteEffectsGameTests"
 		]
 	},
 	"depends": {

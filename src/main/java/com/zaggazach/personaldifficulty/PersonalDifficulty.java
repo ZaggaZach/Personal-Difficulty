@@ -25,6 +25,9 @@ public class PersonalDifficulty implements ModInitializer {
 		// Peaceful: cancel the hit before any vanilla processing (no knockback, sound, effects or health change).
 		ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> PdHooks.allowDamage(entity, source));
 
+		// Elite combat effects: observe damage that really happened (never fires for cancelled/Peaceful hits)
+		ServerLivingEntityEvents.AFTER_DAMAGE.register(PdMobEffects::afterDamage);
+
 		ServerLifecycleEvents.SERVER_STARTING.register(server -> {
 			Path configDir = FabricLoader.getInstance().getConfigDir();
 			Path configFile = configDir.resolve(PdConfigLoader.FILE_NAME);

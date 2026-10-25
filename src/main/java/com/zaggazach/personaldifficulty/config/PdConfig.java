@@ -20,7 +20,9 @@ public record PdConfig(
 	boolean voidApplyProfile,
 	boolean adminApplyProfile,
 	RangedMobs rangedMobs,
-	EliteAi eliteAi
+	EliteAi eliteAi,
+	EliteHunt eliteHunt,
+	EliteEffects eliteEffects
 ) {
 	public static final double MAX_MULTIPLIER = 10.0;
 	public static final double MAX_UNCERTAINTY = 60.0;
@@ -29,6 +31,11 @@ public record PdConfig(
 	/** Range multipliers may at most double a mob's own range (and are further capped, see EliteSurvival). */
 	public static final double MAX_AI_RANGE_MULTIPLIER = 2.0;
 	public static final double MAX_MEMORY_MULTIPLIER = 4.0;
+	public static final int MIN_SCAN_INTERVAL_TICKS = 5;
+	public static final int MAX_SCAN_INTERVAL_TICKS = 40;
+	public static final int MAX_REACQUIRE_SECONDS = 30;
+	/** Upper bound for every Elite mob-effect duration and for the refresh cap. */
+	public static final int MAX_EFFECT_SECONDS = 60;
 
 	/**
 	 * One personal difficulty profile.
@@ -66,6 +73,38 @@ public record PdConfig(
 	) {
 	}
 
+	/**
+	 * Elite target priority (1.3.0).
+	 *
+	 * @param priorityEnabled hostile mobs prefer an eligible Elite player over any other player, including one they
+	 *     are already fighting
+	 * @param scanIntervalTicks how often (per mob, staggered by entity id) an already-busy mob re-evaluates its target
+	 * @param reacquireHiddenSeconds a mob that lost sight of an Elite target keeps tracking them by pathfinding (never
+	 *     through walls) for this long; 0 turns it off
+	 */
+	public record EliteHunt(boolean priorityEnabled, int scanIntervalTicks, int reacquireHiddenSeconds) {
+	}
+
+	/** One attacker family's effect: probability per successful hit and base duration. */
+	public record MobEffectSetting(double chance, int seconds) {
+	}
+
+	/**
+	 * Effects that hostile mobs inflict on ELITE players when they genuinely damage them (1.3.0).
+	 *
+	 * @param maxDurationSeconds no effect from this system is ever refreshed beyond this remaining duration
+	 */
+	public record EliteEffects(
+		boolean enabled,
+		int maxDurationSeconds,
+		MobEffectSetting zombie,
+		MobEffectSetting spider,
+		MobEffectSetting caveSpider,
+		MobEffectSetting skeleton,
+		MobEffectSetting drowned
+	) {
+	}
+
 	/** Which ranged attacker families have their aim adjusted (Easy: wider, Elite: tighter). */
 	public record RangedMobs(boolean skeletons, boolean illusioners, boolean drowned, boolean crossbowMobs, boolean piglins, boolean witches) {
 	}
@@ -85,7 +124,10 @@ public record PdConfig(
 			false,
 			false,
 			new RangedMobs(true, true, true, true, true, true),
-			new EliteAi(1.25, 1.25, true, 2.0, true)
+			new EliteAi(1.25, 1.25, true, 2.0, true),
+			new EliteHunt(true, 10, 8),
+			new EliteEffects(true, 30, new MobEffectSetting(0.35, 8), new MobEffectSetting(0.35, 5), new MobEffectSetting(0.50, 6),
+				new MobEffectSetting(0.25, 4), new MobEffectSetting(0.30, 3))
 		);
 	}
 }

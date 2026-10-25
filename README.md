@@ -9,7 +9,7 @@ which difficulties may be chosen.
 | **Normal** | Plain vanilla (the default for everyone). |
 | **Easy** | 60 % of the damage, half the hunger, enemy archers aim worse. |
 | **Hard** | 125 % of the damage, 125 % hunger. |
-| **Elite** | A serious survival challenge: weaker armour, double damage, double hunger, half-speed natural healing, sharper archers and sharper hunters. |
+| **Elite** | The hunted difficulty: weaker armour, double damage, double hunger, half-speed natural healing, sharper archers - and hostile mobs prefer you over everyone else and may leave you infected, venomed or slowed. |
 | **Peaceful** | A personal safe mode: no damage (except the void and `/kill`), mobs ignore you, no hunger, no PvP either way. |
 
 The world's actual difficulty is **never changed** by this mod. Different players can use different
@@ -135,6 +135,55 @@ found no extended acquisition - not supported), endermen (provoked by gaze), pha
 and hoglins, the Warden, the Ender Dragon, blazes, ghasts, breezes, the Wither, illagers other than the vindicator and
 pillager, zombified piglins, and all modded mobs.
 
+#### Hunted: hostile mobs prefer Elite players (1.3.0)
+Hostile mobs now prefer an eligible Elite player over any other player - **including one they are already fighting**.
+
+* **How.** Vanilla only picks a target when a mob has none, so a mob busy with a Normal player would never notice an Elite
+  one. Every `elite.priority.scan-interval-ticks` (default 10, staggered per mob) a mob that is not already hunting an Elite
+  player takes the nearest eligible one, and the vanilla "nearest player" goal prefers Elite candidates when it does run and
+  will not replace a valid Elite target with an ordinary player.
+* **Eligible** means: an Elite player (never Peaceful), alive, not a spectator, within the mob's acquisition range
+  (`elite.ai.acquisition-range-multiplier` x its own follow range, capped at 64) **and** passing the mob's own targeting rules:
+  line of sight, invisibility, head gear, `canAttack`. No wallhacks, no teleporting, no global awareness.
+* **Stable.** A mob that already hunts a valid Elite player keeps that target; it never swaps between Elite players, so groups
+  of Elite players cannot make it flip-flop. It switches only when its Elite target is gone (dead, Peaceful, out of range,
+  forgotten, disconnected) and then takes the nearest remaining candidate.
+* **Hidden targets.** A mob that lost sight of an Elite player keeps hunting (memory x2, see 1.2.0) and, for
+  `elite.priority.reacquire-hidden-seconds` (default 8 s) after it last SAW them, may re-acquire that same player without line of
+  sight - but only if its pathfinder finds a **complete route** to them within range (around obstacles, never through them; a
+  sealed room is never entered).
+* **Recovery.** When the Elite target becomes invalid the mob goes back to vanilla targeting and hunts ordinary players again
+  within a few ticks. Switching to Peaceful drops the target within 3 ticks; switching to Elite makes a player eligible within one
+  scan interval - no restart. Death, respawn, disconnect and reconnect (same UUID) are handled.
+* **Who takes part.** Only hostile mobs that own a player-hunting goal. Passive and neutral mobs (cows, villagers, iron golems,
+  wolves, **endermen, zombified piglins**) are never drawn in. Spiders obey vanilla's rule and stay neutral in daylight.
+* **Retaliation.** If an ordinary player hits a mob that is hunting an Elite player, vanilla retaliation may briefly turn the mob
+  toward them; the next scan turns it back to the Elite player.
+* `elite.priority.enabled=false` restores the 1.2.0 behaviour (wider range only when vanilla found nobody).
+
+Verified with live AI for: zombie, husk, skeleton, stray, creeper, spider and cave spider (in the dark), vindicator and
+pillager. **Not verified, so not claimed:** every other mob (see `docs/VERIFICATION.md`).
+
+#### Elite combat effects (1.3.0)
+When one of these mobs **genuinely damages** an Elite player it may inflict a temporary effect. "Genuinely" means: the hit
+was not cancelled (Peaceful, invulnerability frames), not blocked by a shield, and the player's health plus absorption actually
+went down (so a hit that Resistance reduced to zero counts for nothing); and the cause is the mob's own melee attack or its own
+arrow. Fire, poison, explosions, thorns, falls, PvP and every other source never trigger anything.
+
+| Attacker | Effect | Chance | Duration | Notes |
+|---|---|---|---|---|
+| Zombie, zombie villager | **Infection**: Weakness I + Hunger I | 35 % | 8 s | Hit again while still infected: deepened once to Weakness II + Hunger II + Nausea (about 4 s); never beyond. |
+| Spider | Slowness I | 35 % | 5 s | Melee. |
+| Cave spider | Slowness II | 50 % | 6 s | On top of vanilla's own poison (Normal/Hard worlds). |
+| Skeleton | Slowness I | 25 % | 4 s | **Arrow hits only**, once per damaging hit. |
+| Drowned | Slowness I | 30 % | 3 s | Melee only (not thrown tridents). |
+| Husk, stray, bogged, witch, others | nothing added | - | - | Husks already inflict vanilla Hunger; strays and bogged shoot arrows that already carry their own effect; witches already throw potions. |
+
+Bounds: a refresh sets the duration to `max(remaining, base)` capped at `elite.effects.max-duration-seconds` (30 s), amplifiers
+never exceed the values above, and a stronger effect from another source (a potion, say) is never weakened. Only **Elite**
+victims are affected; other difficulties and Peaceful players never receive any of this. `elite.effects.enabled=false` turns
+the whole feature off; normal attacks are unaffected.
+
 Elite does not weaken attacks against other players, does not touch PvP, self-inflicted, void or `/kill` damage
 (same exceptions as Easy and Hard), and never changes any mob globally.
 
@@ -209,6 +258,21 @@ elite.ai.follow-range-multiplier=1.25        # 1.0 .. 2.0
 elite.ai.improved-pursuit=true
 elite.ai.target-memory-multiplier=2.0        # 1.0 .. 4.0
 elite.ai.advanced-combat=true
+elite.priority.enabled=true                   # hostile mobs prefer Elite players
+elite.priority.scan-interval-ticks=10         # 5 .. 40
+elite.priority.reacquire-hidden-seconds=8     # 0 .. 30, 0 = off
+elite.effects.enabled=true
+elite.effects.max-duration-seconds=30         # 1 .. 60
+elite.effects.zombie-infection-chance=0.35    # per damaging hit, 0 .. 1
+elite.effects.zombie-infection-seconds=8      # 1 .. 60
+elite.effects.spider-venom-chance=0.35
+elite.effects.spider-venom-seconds=5
+elite.effects.cave-spider-venom-chance=0.50
+elite.effects.cave-spider-venom-seconds=6
+elite.effects.skeleton-shot-chance=0.25
+elite.effects.skeleton-shot-seconds=4
+elite.effects.drowned-chill-chance=0.30
+elite.effects.drowned-chill-seconds=3
 #easy.damage-type.minecraft.fall=0.3   # optional per-damage-type override (easy|hard|elite)
 ```
 
@@ -239,6 +303,19 @@ The `players.json` format did not change, so there is **no rewrite on upgrade**:
 
 ## Limitations
 
+* **Elite priority is "prefer", not "omniscient".** A mob only ever prefers an Elite player it could legitimately target: within a
+  finite range, in line of sight (or recently seen and reachable by a complete path), visible under vanilla's rules, never
+  Peaceful. A mob that is hunting an Elite player may be briefly turned by vanilla retaliation if an ordinary player hits it; the
+  next scan (default 10 ticks) turns it back. Only mobs that own a vanilla player-hunting goal take part: modded mobs with custom
+  targeting, the Warden, piglins, hoglins, endermen and zombified piglins (provocation-based) and the Ender Dragon do not.
+  Spiders stay neutral in daylight. In a crowd, every mob that can see an Elite player may go for them.
+* **Combat effects are attributed conservatively.** Only the exact families in the table fire; ranged effects only for plain
+  skeleton arrows; a hit must actually reduce health or absorption. Other mods that change `LivingEntity.hurtServer` or fire damage
+  events in an unusual order may defeat the attribution. Infection does not spread between players (deliberately).
+* **Effects stack on top of vanilla's own.** Cave spiders also poison on Normal/Hard worlds, husks inflict Hunger, strays slow with
+  their arrows. Slowness II plus poison from a cave spider on a low-health Elite player is genuinely dangerous; tune
+  `elite.effects.*` if that is too much.
+
 * **Elite hostile-mob behaviour is not a full AI rewrite.** It widens notice/chase radius, extends the pathfinder's search
   length and target memory, and speeds skeleton bow cadence, for the mobs listed above. It does not add flanking,
   coordinated groups, door-breaking, dodging or ranged-mob kiting, and the shorter melee re-check is not measured by a
@@ -268,8 +345,8 @@ The `players.json` format did not change, so there is **no rewrite on upgrade**:
 ## Building from source
 
 ```
-./gradlew build            # compiles and runs the 89 unit tests -> build/libs/personal-difficulty-<version>.jar
-./gradlew runGameTest      # 86 in-server integration tests (85 of ours + the framework's always_pass) (real ServerPlayer / mobs / mixins)
+./gradlew build            # compiles and runs the 94 unit tests -> build/libs/personal-difficulty-<version>.jar
+./gradlew runGameTest      # 116 in-server integration tests (115 of ours + the framework's always_pass) (real ServerPlayer / mobs / mixins)
 ./gradlew runServer        # local dev server in run/ (accept the EULA in run/eula.txt first)
 ```
 

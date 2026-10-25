@@ -1,4 +1,146 @@
-# Verification report: Personal Difficulty 1.2.0
+# Verification report: Personal Difficulty 1.3.0
+
+Status keys: **PASS** = executed here and passed. **NOT RUN** = not executed here. **NOT IMPLEMENTED** = deliberately absent.
+Nothing is claimed beyond what was run. 1.3.0 changes only Elite (target priority and combat effects). The 1.2.0 report is kept
+below as Appendix A, the 1.1.0 report inside it as Appendix B.
+
+## 1. Toolchain
+Unchanged: Minecraft 26.3, Fabric Loader 0.20.1, Fabric API 0.165.0+26.3, Loom 1.19.3, Gradle 9.8.2, Temurin 25.0.5+8.
+Fabric API's `ServerLivingEntityEvents.AFTER_DAMAGE` signature `(LivingEntity, DamageSource, float, float, boolean)` was confirmed by
+decompiling the shipped `fabric-entity-events-v1-6.0.4` jar; vanilla internals were read from the decompiled 26.3 sources.
+
+## 2. Final results (branch `feature/1.3.0-elite-hunted`, from `c230e54`)
+
+### 2.1 Build and unit tests: **PASS 94 / 94**
+`./gradlew clean build` -> BUILD SUCCESSFUL. New: `EliteHuntConfigTest` (5): defaults, absent file = defaults, valid values, 12
+malformed/out-of-range values (each warned, clamped or defaulted), every new key present and documented in the shipped default file.
+
+### 2.2 In-server tests: **PASS 116 / 116** (115 ours + the framework's `always_pass`)
+The 85 tests of 1.2.0 (all still passing) plus **30 new**: `EliteHuntGameTests` 19 and `EliteEffectsGameTests` 11. The complete suite
+passed **3 times in a row** on the final build (and 3 + 2 times on the two builds before it).
+`ai_*` = live, unmodified vanilla goal AI over many ticks; `direct_*` / `sync_*` = a real mob's real attack, or a real damage source,
+inside one server tick (needed because the config differs from the default and is global while tests run in parallel).
+
+### 2.3 What the new tests prove
+
+**Priority per mob family** (live AI; lane A control: two Normal players, lane B: a Normal player at 0.35x the mob's follow range and an
+Elite player at 0.7x, both in line of sight; one run shown):
+
+| Mob | Follow range | Control: nearer Normal hunted (ticks of 120) | Elite lane: Elite hunted / nearer Normal hunted after tick 25 |
+|---|---|---|---|
+| zombie | 37.9 | 109 | 116 / 0 |
+| husk | 35.9 | 95 | 118 / 0 |
+| skeleton | 17.4 | 102 | 119 / 0 |
+| stray | 15.9 | 120 | 117 / 0 |
+| creeper | 16.4 | 117 | 119 / 0 (exploded at the end, as designed) |
+| spider (in the dark) | 14.6 | 110 | 119 / 0 |
+| cave spider (in the dark) | 16.0 | 107 | 119 / 0 |
+| vindicator | 12.4 | 114 | 120 / 0 |
+| pillager | 31.5 | 117 | 118 / 0 |
+
+* **Switching:** a zombie hunting a Normal player (Normal lane) or an Easy player (Easy lane) takes a newcomer who *becomes* Elite within
+  20 ticks and stays on them; drops them within 3 ticks when they turn Peaceful and never targets them again; recovers to the
+  ordinary player; takes the newcomer again within 20 ticks after they turn Elite once more. No restart.
+* **Several Elite players:** 0 flip-flops in 120 ticks; after the hunted one's position was changed so that the *other* Elite player
+  became nearer (still in range, still visible), the zombie stayed on its target; when the hunted one left Elite it moved on to the
+  other Elite player.
+* **Limits:** an Elite player behind a solid wall is never selected (ordinary player hunted instead); an Elite player at 1.7x the follow
+  range (beyond the 1.25x acquisition range) is never selected.
+* **Hidden targets:** after losing its target a zombie re-acquires a hidden Elite player it recently saw when a doorway makes a
+  complete route; a zombie never re-acquires a player in a sealed stone room (memory injected into that mob because it never had
+  line of sight); a hidden Elite target is kept for its extended memory (not swapped for a visible ordinary player) and forgotten
+  after it (122-130 ticks vs 61 for an ordinary target); a held Elite target cannot be replaced by the nearest-player goal.
+* **Lifecycle:** death (stops being the target), respawn, disconnect and reconnect with the same UUID: hunted again each time.
+* **Passive / neutral:** cow, villager, iron golem, wolf, zombified piglin and enderman near an Elite player never target them.
+* **Config:** with `elite.priority.enabled=false` (and no widened range) a zombie hunts the nearer ordinary player like vanilla;
+  with it on, the Elite player (single-tick test, manual mob ticks).
+
+**Combat effects** (real mob attacks through `doHurtTarget`; chance forced to 1.0 where stated):
+* zombie hit infects an Elite player: Weakness I + Hunger I for at most 8 s, exactly one application for one hit; Normal, Easy, Hard
+  and Peaceful players never receive anything (Peaceful takes no damage either).
+* a shield-blocked hit and a hit reduced to zero by Resistance V apply nothing; the same zombie without Resistance does.
+* 12 unrelated sources (fall, fire, magic, explosion, thorns, indirect magic, PvP, other mobs' attacks, cactus, drowning, a zombie's
+  projectile damage) never trigger an attacker effect.
+* spider: Slowness I <= 5 s; cave spider: Slowness II <= 6 s (plus vanilla poison); drowned melee: Slowness I <= 3 s; zombie villager:
+  infection; husk: nothing added.
+* chance 0 never applies (100 hits); the default 0.35 landed 203 / 213 / 199 of 600 hits across runs (expected 210 +/- 36); duration
+  3 s is honoured; a second infection while ill deepens to Weakness II + Hunger II + Nausea, forty more hits never exceed amplifier II
+  or the configured 20 s cap; a Weakness III potion is never weakened; `elite.effects.enabled=false` leaves attacks landing and hurting
+  with no effect; malformed values fall back safely.
+* **live skeletons** (12) shot an Elite player: 19-42 arrow hits per run (five runs), 6-10 applications, **never more than one application per hit**
+  (measured per damage event), not every arrow; **8-16 strays** landed 3-40 arrows (across runs) in the same period and added **no** effect.
+
+**Performance (informational, parallel noisy test server):** 120 engaged zombies with one Elite player far away: 16.8 ms mean tick
+without any Elite player online vs 16.3 ms with one online (no measurable cost). Dedicated server: 40 idle zombies, 0.4 ms average per tick.
+
+### 2.4 Mutation checks: **PASS**
+One critical hook neutralised at a time; the unmodified source was restored byte-for-byte after each (verified with `cmp`):
+
+| Mutation | Result |
+|---|---|
+| `huntTick` disabled | 4 tests fail (switching, oscillation/recovery, hidden re-acquisition, lifecycle) |
+| nearest-player goal guard removed | 1 test fails (held Elite target replaced by a visible ordinary player) |
+| effects listener disabled | 8 effect tests fail |
+| "health actually went down" check removed | the blocked / fully-prevented test fails |
+| stability rule (no swapping between Elite targets) removed | the oscillation test fails |
+| owned-target validation removed | the memory test fails (a hidden target was never forgotten) |
+
+Two mutations initially **survived** (the goal guard and the stability rule): the tests were too weak and were strengthened until
+they failed under the mutation (documented in 2.6).
+
+### 2.5 Standalone dedicated-server smoke test of the final JAR: **PASS**
+`personal-difficulty-1.3.0.jar` + Fabric API in a genuine Fabric server (Loader 0.20.1, MC 26.3, Java 25), offline mode, loopback,
+disposable Hard world, driven from the console (three sessions):
+* mod loads, all 21 mixins apply (`defaultRequire` would abort startup otherwise), no exception, clean shutdown;
+* a fresh server writes the 15 new keys; a 1.2.0-style config (no new keys) loads with defaults; invalid values warn and are clamped or
+  defaulted (`perhaps`, `1`, `99999`, `NaN`, `lots`, `-5`, `7`); `admin config`/`admin reload` work and describe the new behaviour;
+* `/difficulty` stays **Hard** throughout (never changed); 40 summoned zombies idle at 0.4 ms average tick.
+**NOT done there:** a real player joining (no client available), so priority targeting and effects were *not* observed on the standalone
+server; they were verified in the GameTest server (same game code, real `ServerPlayer`s without a network client).
+
+### 2.6 Honesty log of what failed during development
+* Mobs placed on a void island (to keep them still) walked off it and died, silently invalidating measurements; replaced by vanilla's
+  home restriction. A test lane that let a hunter drift into range of another lane's player was fixed with knockback immunity.
+* `PathNavigation.createPath(...).canReach()` is **not** side-effect free: a repeated identical request returns the mob's *active* path
+  (a stale stroll path reported `canReach() == true` for a sealed room). Found as a ~25 % flaky test; fixed with a fresh pathfinder
+  search through an accessor mixin.
+* A target set by the scan has no vanilla goal watching it: a hidden player stayed targeted forever and a player who left Elite was
+  never forgotten. Fixed with owned-target validation (and adoption of Elite targets set by anyone).
+* Fabric's `AFTER_DAMAGE` also fires for hits that Resistance reduced to zero, with a figure from the start of the pipeline.
+  The first effects test applied an infection through Resistance V; fixed by checking that health + absorption really went down.
+* The "who is Elite" cache was initially keyed by game tick only and could be stale within a tick; it is now also keyed by the
+  mode-change counter and player count.
+* Witches: not supported / not claimed (1.2.0 finding retained).
+
+### 2.7 JAR inspection: **PASS**
+`build/libs/personal-difficulty-1.3.0.jar`, **105,213 bytes**, sha256 `7d97ae9e6a733f0178fc12a99ed5d25d400159a5a9a0c59d123aa6647cdd8919`.
+55 classes (21 mixins), `fabric.mod.json` (`environment: server`, version 1.3.0), Java 25 class files (major 69), no
+`net.minecraft.client` references, no gametest classes, no bundled Loader/Fabric API/Gson, no call that sets the world difficulty.
+`release/1.0.0` (top level), `release/1.1.0` and `release/1.2.0` are untouched.
+
+## 3. NOT RUN
+* **A real Minecraft client or any real player.** Nothing is claimed about real-client compatibility, how infected/slowed players look,
+  or multiplayer feel. All "live" behaviour was observed with server-side mock players.
+* Live AI for mobs not in the table: witches (not supported), phantoms, bogged, parched, wither skeletons, zombie villagers, blazes, ghasts,
+  breezes, evokers/illusioners, ravagers, silverfish, endermites, guardians, the Wither; modded mobs.
+* Effects: drowned only by direct attack (no live drowned in water); spider/cave spider effects only by direct attack (their priority is
+  live-tested); no live zombie melee run on the effects path other than the autonomous skeleton test.
+* Infection spreading between players (not implemented by design); long soak tests; large crowds (hundreds of mobs); nether/end;
+  interaction with other mods that touch targeting or damage events.
+* Publishing: no push, pull request, tag, release or Modrinth upload.
+
+## 4. NOT IMPLEMENTED
+Player-to-player infection; effects for husks, strays, bogged, phantoms, pillagers, witches (vanilla already gives most of them their
+own); making passive or neutral mobs attack Elite players; any omniscient or wall-piercing detection.
+
+## 5. Known risks and recommended practical tests
+1. Real-client behaviour is unverified. 2. Elite is now very hard (double damage, half healing, hunted by everything with effects on
+top); numbers are a design estimate, tune `elite.*`. 3. Mobs go for Elite players already engaged with others; in a crowd an Elite player
+draws the whole mob. 4. Slowness II + poison from cave spiders in low light is dangerous. 5. Mods that replace targeting goals,
+or fire damage in unusual orders, may bypass or confuse the hooks. See README "Limitations" and the playtest plan in the final report.
+
+# Appendix A: Verification report for 1.2.0 (retained unchanged)
+
 
 Status keys: **PASS** = executed here and passed. **NOT RUN** = not executed here. **NOT IMPLEMENTED** = deliberately absent.
 Nothing is claimed beyond what was run. 1.2.0 changes only Elite (natural regeneration and hostile-mob behaviour); everything
@@ -141,7 +283,7 @@ vanilla `NearestAttackableTargetGoal`/`TargetGoal`/`PathNavigation`, raising Eli
 5. Mob farms/spawners next to an Elite player may produce more hunters at once; watch server tick time with a farm running.
 6. Mods that replace targeting goals may bypass or conflict with the hooks.
 
-# Appendix: Verification report for 1.1.0 (retained unchanged)
+# Appendix B: Verification report for 1.1.0 (retained unchanged)
 
 
 Status keys: **PASS** = executed here and passed. **NOT RUN** = not executed here. **NOT IMPLEMENTED** = deliberately absent.

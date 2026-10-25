@@ -45,7 +45,7 @@ public class EliteAiGameTests {
 	private static final int WIDTH = 100;
 	private static final int LANE_B = 80;
 
-	private static final class Arena {
+	static final class Arena {
 		final ServerLevel level;
 		final int x0;
 		final int y;
@@ -77,18 +77,14 @@ public class EliteAiGameTests {
 		}
 
 		/**
-		 * A mob standing on a small island (the ring around its 3x3 platform is removed, so the void keeps it from strolling
-		 * away): measurements that need the mob to stay where it is must not depend on its random wandering.
+		 * A mob that idles near its start: vanilla's "home" restriction keeps its random strolling within 4 blocks (it does not
+		 * hold it back once it hunts a target). An earlier version isolated mobs on a void island; strafing and jumping mobs
+		 * walked off it and died, which silently invalidated those measurements.
 		 */
 		Mob spawnOnIsland(EntityType<? extends Mob> type, double x, double z) {
-			for (int dx = -3; dx <= 3; dx++) {
-				for (int dz = -3; dz <= 3; dz++) {
-					if (Math.abs(dx) > 1 || Math.abs(dz) > 1) {
-						level.setBlock(new BlockPos(x0 + (int) x + dx, y, z0 + (int) z + dz), Blocks.AIR.defaultBlockState(), 18);
-					}
-				}
-			}
-			return spawn(type, x, z);
+			Mob m = spawn(type, x, z);
+			m.setHomeTo(BlockPos.containing(x0 + x, y + 1, z0 + z), 4);
+			return m;
 		}
 
 		/** A mob standing at platform coordinates (x, z). */
@@ -109,6 +105,8 @@ public class EliteAiGameTests {
 
 		ServerPlayer player(GameTestHelper h, String name, PersonalDifficultyMode mode, double x, double z) {
 			ServerPlayer p = PdTestSupport.player(h, name, mode);
+			// mobs' hits must not shove the stationary test players around (that made hunters drift into other lanes)
+			p.getAttribute(Attributes.KNOCKBACK_RESISTANCE).setBaseValue(1.0);
 			p.snapTo(x0 + x, y + 1, z0 + z);
 			players.add(p);
 			return p;
@@ -135,12 +133,12 @@ public class EliteAiGameTests {
 		}
 	}
 
-	private static void finish(GameTestHelper h, Arena a) {
+	static void finish(GameTestHelper h, Arena a) {
 		a.close();
 		h.succeed();
 	}
 
-	private static double followRange(Mob m) {
+	static double followRange(Mob m) {
 		return m.getAttributeValue(Attributes.FOLLOW_RANGE);
 	}
 
@@ -395,10 +393,10 @@ public class EliteAiGameTests {
 		Arena a = new Arena(h, 5);
 		Mob mN = a.spawnOnIsland(EntityTypes.ZOMBIE, 5, 5);
 		Mob mE = a.spawnOnIsland(EntityTypes.ZOMBIE, 5, LANE_B + 5);
-		Mob mS = a.spawnOnIsland(EntityTypes.ZOMBIE, 5, 40);
+		Mob mS = a.spawnOnIsland(EntityTypes.ZOMBIE, 65, 40);
 		ServerPlayer pN = a.player(h, "pd_me_n", NORMAL, 5 + 30, 5);
 		ServerPlayer pE = a.player(h, "pd_me_e", ELITE, 5 + 30, LANE_B + 5);
-		ServerPlayer pS = a.player(h, "pd_me_s", ELITE, 5 + 30, 40);
+		ServerPlayer pS = a.player(h, "pd_me_s", ELITE, 65 + 30, 40);
 		long[] hiddenAt = {0};
 		long[] dropN = {-1}, dropE = {-1}, dropS = {-1};
 		boolean[] acquired = {false, false, false};
@@ -411,9 +409,9 @@ public class EliteAiGameTests {
 				acquired[0] = mN.getTarget() == pN;
 				acquired[1] = mE.getTarget() == pE;
 				acquired[2] = mS.getTarget() == pS;
-				a.wall(5 + 18, -4, 25);
-				a.wall(5 + 18, 26, 60);
-				a.wall(5 + 18, 61, WIDTH + 4);
+				// full-width walls: with the 1.2.0 islands gone (mobs fell off them) a short wall could be walked around
+				a.wall(5 + 18, -4, WIDTH + 4);
+				a.wall(65 + 18, -4, WIDTH + 4);
 				hiddenAt[0] = t;
 				setMode(pS, NORMAL); // this Elite player becomes Normal the moment they hide: no extended memory may remain
 			} else if (t > 60) {

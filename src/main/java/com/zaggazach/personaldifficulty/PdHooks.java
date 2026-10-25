@@ -121,6 +121,7 @@ public final class PdHooks {
 		if (rt == null) {
 			return true;
 		}
+		PdMobEffects.noteBeforeHit(victim);
 		ServerPlayer responsible = responsiblePlayer(source);
 		boolean blocked = PeacefulRules.blocksDamage(
 			true,

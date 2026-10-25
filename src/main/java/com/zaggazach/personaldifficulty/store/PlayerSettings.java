@@ -40,6 +40,7 @@ public final class PlayerSettings {
 	private final Map<String, JsonElement> preserved = new LinkedHashMap<>();
 	private final Path file;
 	private final List<String> loadWarnings = new ArrayList<>();
+	private volatile int changes;
 	private int legacyNormalised;
 
 	/** @param file backing file, or null for a memory-only instance (tests) */
@@ -56,6 +57,11 @@ public final class PlayerSettings {
 		return legacyNormalised;
 	}
 
+	/** Bumped on every change to any selection; lets caches of "who is Elite" notice a mode switch within the same tick. */
+	public int changeCount() {
+		return changes;
+	}
+
 	public PersonalDifficultyMode get(UUID id) {
 		return modes.getOrDefault(id, PersonalDifficultyMode.DEFAULT);
 	}
@@ -63,6 +69,7 @@ public final class PlayerSettings {
 	/** Sets and persists. NORMAL (the default) removes the entry. */
 	public synchronized void set(UUID id, PersonalDifficultyMode mode) throws IOException {
 		PersonalDifficultyMode previous = mode == PersonalDifficultyMode.DEFAULT ? modes.remove(id) : modes.put(id, mode);
+		changes++;
 		try {
 			save();
 		} catch (IOException e) {
@@ -92,6 +99,7 @@ public final class PlayerSettings {
 
 	/** Loads the file if present. Malformed content is handled entry-by-entry and reported. */
 	public synchronized void load() {
+		changes++;
 		modes.clear();
 		preserved.clear();
 		loadWarnings.clear();

@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.3.0
+
+Minecraft 26.3, Fabric Loader 0.20.1+, Fabric API 0.165.0+26.3, Java 25. Server-side only. Drop-in upgrade from 1.2.0 (all
+existing files keep working; new config keys take their defaults, nothing is rewritten). Only **Elite** changes; the world's
+vanilla difficulty is never touched.
+
+### Added
+* **Elite target priority.** Hostile mobs prefer an eligible Elite player over any other player, including one they are
+  already fighting. Throttled, staggered per-mob re-evaluation (`elite.priority.scan-interval-ticks`) plus a preference inside
+  the vanilla nearest-player goal. Stable (a mob never swaps between Elite targets while its target is valid), line of sight and
+  all vanilla targeting rules respected, finite ranges, Peaceful never eligible, immediate response to mode switches, death,
+  respawn and reconnect.
+* **Hidden-target re-acquisition** (`elite.priority.reacquire-hidden-seconds`, default 8, 0 = off): a mob that lost sight of an
+  Elite target may re-acquire that player without line of sight, only if its pathfinder finds a complete route.
+* **Elite combat effects** (`elite.effects.*`): zombies and zombie villagers infect (Weakness + Hunger, deepening once), spiders
+  and cave spiders slow, skeleton arrows slow, drowned slow. Applied only when the mob (or its arrow) genuinely damages an Elite
+  player; bounded, never stacked without limit, never weakening a stronger existing effect.
+* 15 new config keys (validated and clamped like the others), 2 new mixins (`MobHuntMixin`, `PathNavigationAccess`; 21 in total),
+  `/personaldifficulty admin config` describes the new behaviour.
+* Tests: 5 new unit tests (94 in total) and 30 new in-server tests (115 of ours + the framework's `always_pass` = 116), including
+  live-AI tests for nine mob types, switching/recovery/oscillation/lifecycle tests, a real-arrow test and six mutation checks (see
+  docs/VERIFICATION.md).
+
+### Fixed / changed
+* The 1.2.0 `elite.ai.*` acquisition now also applies when vanilla did find an ordinary player (previously only when it found
+  nobody) while `elite.priority.enabled` is on.
+* Found while testing 1.3.0: asking vanilla's `PathNavigation.createPath` "is there a route?" is not side-effect free (a repeated
+  identical request returns the mob's active path). The route check uses a fresh pathfinder search instead.
+
+### Not in this release (see README "Limitations" and docs/VERIFICATION.md)
+Live-AI verification for any mob not named there (including witches, phantoms, piglins, hoglins, the Warden, endermen, blazes,
+ghasts); effects for husks, strays, bogged, phantoms, pillagers and witches (deliberately none: vanilla already gives them
+their own); infection spreading between players; real-client testing.
+
 ## 1.2.0
 
 Minecraft 26.3, Fabric Loader 0.20.1+, Fabric API 0.165.0+26.3, Java 25. Server-side only. Drop-in upgrade from 1.1.0:

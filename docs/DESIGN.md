@@ -169,3 +169,69 @@ zombie villager, bogged, parched, wither skeleton, other illagers, zoglin-like m
 not covered or not claimed: spiders (night-only goal), witches (live test found no extended acquisition), endermen, piglins
 and hoglins (brain-driven), the Warden (sensor-driven), the Ender Dragon, blazes, ghasts, breezes, phantoms, guardians,
 the Wither, zombified piglins, modded mobs.
+
+## Elite hunted (1.3.0)
+
+### Why a new hook instead of only widening the existing goal
+Vanilla re-runs target selection only when a mob has no target (`NearestAttackableTargetGoal.canUse`, throttled to ~1 in 10
+ticks) or when `HurtByTargetGoal` fires. A zombie busy with a Normal player therefore never looks for anyone else. The 1.2.0
+hook (second-chance search when vanilla found nobody) cannot change that. Options considered:
+
+| Option | Verdict |
+|---|---|
+| Replace `Mob.targetSelector` goals with custom ones | rejected: breaks other mods, loses vanilla behaviour for every mob |
+| Mixin into `NearestAttackableTargetGoal.canUse` only | insufficient: not evaluated while the mob already has a target |
+| Tick every mob, scan all players every tick | rejected: cost |
+| **Throttled per-mob check in `Mob.serverAiStep` + preference inside the vanilla goal** | chosen |
+
+### The pieces
+* `MobHuntMixin` (on `Mob`): one call per AI step into `PdHunt.huntTick`, which exits after a modulo test unless this is the
+  mob's scan tick (`(tickCount + entityId) % scan-interval == 0`, so mobs are spread across ticks) and the mob owns a goal that
+  picks players (cached tri-state computed once from `targetSelector`). Endermen and zombified piglins are excluded explicitly
+  (their anger is provocation-based: forcing a target on them would turn a neutral mob hostile).
+* `PdHunt.elites(level)`: the Elite players of a level, rebuilt at most once per game tick and only when some mob asks; an
+  empty result is a shared constant, so levels without Elite players pay one `List.isEmpty()` per scan.
+* Selection: the nearest Elite player that passes a `TargetingConditions.forCombat().range(r)` test (line of sight, invisibility,
+  head gear, selector and `canAttack`, which already contains the Peaceful gate). `r = follow range x acquisition multiplier`,
+  capped at 64 (never below the mob's own range). First in player-list order wins exact ties.
+* **Stability rule:** a mob holding a live Elite target keeps it. Elite-to-Elite swaps therefore never happen while the target
+  is valid. Distance changes cannot cause oscillation because distance is only consulted when choosing among candidates, i.e.
+  when no Elite target is held.
+* `NearestAttackableTargetGoalMixin`: (a) `canUse` returns false while the mob holds a live Elite target, otherwise the goal
+  would start and replace it with the nearest ordinary player; (b) `findTarget` prefers an Elite candidate (extended range) over
+  whatever vanilla found. (c) implements `PlayerTargetingGoal` so the mob can tell whether it hunts players.
+* **Owned targets.** A target set by `huntTick` has no vanilla goal running over it (the goal is deliberately blocked), so
+  nothing would ever drop it. `PdHunt.stillValid` enforces the rules a target goal would: alive; within the pursuit range
+  (Elite: follow x pursuit factor, otherwise vanilla follow range); not unseen for longer than the memory (Elite: 60 x memory
+  multiplier, otherwise 60 ticks). Counted at scan granularity. Found in testing: without this a hidden player stayed targeted
+  forever, and a player who left Elite was never forgotten.
+* **Hidden re-acquisition.** `HuntingMob` stores `(lastElite UUID, lastEliteSeen gameTime)` on the mob (a mixin field; it dies
+  with the mob, so there is no registry to clean). It is refreshed only while the mob actually has line of sight. After the
+  target is lost, within `reacquire-hidden-seconds` the same player is re-acquired iff they are still Elite, pass the targeting
+  rules except line of sight, are within range and `PathNavigation.createPath(player, 0).canReach()` (one A* search per
+  eligible mob per scan, bounded by the mob's follow range). A complete path never crosses solid blocks, so this follows
+  doorways and detours and refuses sealed rooms.
+* **Spiders.** `SpiderTargetGoal` and `SpiderAttackGoal` give up in daylight; forcing a target would make the mob drop it again
+  every few ticks, so daylight spiders are skipped by the scan (vanilla rule retained).
+
+### Combat effects
+`ServerLivingEntityEvents.AFTER_DAMAGE` (Fabric API) fires once per applied hit and not for cancelled hits (so Peaceful and
+invulnerability frames never reach it). It also fires for hits that Resistance or Protection reduce to zero, and the figure it
+passes is the damage from the start of the pipeline, so "damage > 0" is not enough. `PdHooks.allowDamage` (already the first
+listener for every hit) therefore notes the victim's `health + absorption` just before vanilla processes the hit, and
+`PdMobEffects.afterDamage` requires that the total went down. A shield block is excluded by the event's `blocked` flag.
+Attribution: melee requires damage type `mob_attack` whose *direct* entity is the attacker; arrows require damage type `arrow`
+whose direct entity is an arrow *owned* by the attacker. Thorns, magic, fire, explosions, PvP and every other source fail one
+of these. Per-family decisions use exact entity types (`ZOMBIE`, `ZOMBIE_VILLAGER`, `SPIDER`, `CAVE_SPIDER`, `SKELETON`,
+`DROWNED`), so subclasses with their own mechanics (husk: vanilla Hunger; stray/bogged: effect arrows; cave spider: vanilla
+poison) are not doubled up. Effects are refreshed, not stacked: duration `min(cap, max(remaining, base))`, amplifier fixed per
+family, a stronger existing amplifier is left alone; the zombie infection deepens once (II + Nausea) if both Weakness and Hunger
+are already present. Only Elite victims are considered, so Peaceful protection is untouched: a Peaceful hit never reaches
+AFTER_DAMAGE, and `blocksEffect` additionally refuses harmful effects on Peaceful players.
+
+### Cost
+Per mob per AI step: one volatile read, a config read and one modulo. Per scan tick, mobs without a player-hunting goal and
+levels without Elite players exit immediately. Otherwise: one pass over that level's Elite players (usually 1-3) with a squared
+distance early-out before the line-of-sight test. No world scans, no per-tick allocation (the two `TargetingConditions` are
+shared and the Elite list is reused within a tick).
+
