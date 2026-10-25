@@ -1,11 +1,15 @@
 package com.zaggazach.personaldifficulty;
 
+import com.zaggazach.personaldifficulty.config.PdConfig;
 import com.zaggazach.personaldifficulty.logic.DamageAdjuster;
 import com.zaggazach.personaldifficulty.logic.DamageContext;
+import com.zaggazach.personaldifficulty.logic.EliteSurvival;
 import com.zaggazach.personaldifficulty.logic.HungerAdjuster;
 import com.zaggazach.personaldifficulty.logic.PeacefulRules;
 import com.zaggazach.personaldifficulty.logic.RangedAccuracy;
+import com.zaggazach.personaldifficulty.mixin.AbstractSkeletonAccess;
 import java.util.ArrayList;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
@@ -16,6 +20,8 @@ import net.minecraft.world.entity.AreaEffectCloud;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.entity.monster.skeleton.AbstractSkeleton;
 import net.minecraft.world.entity.OwnableEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.Projectile;
@@ -217,5 +223,102 @@ public final class PdHooks {
 
 	public static @Nullable LivingEntity scopedAimTarget() {
 		return AIM_TARGET.get();
+	}
+
+	// ------------------------------------------------------------------ elite: natural regeneration
+
+	/**
+	 * The tick count at which a natural-regeneration cycle fires. Vanilla passes 10 (saturated) or 80 (well fed); Elite
+	 * players get the stretched value, everyone else gets the vanilla value back unchanged.
+	 */
+	public static int regenInterval(ServerPlayer player, int vanillaInterval) {
+		PdRuntime rt = PdRuntime.get();
+		if (rt == null || rt.modeOf(player.getUUID()) != PersonalDifficultyMode.ELITE) {
+			return vanillaInterval;
+		}
+		return EliteSurvival.regenInterval(vanillaInterval, rt.config().eliteRegenMultiplier());
+	}
+
+	// ------------------------------------------------------------------ elite: enemy behaviour (target-specific)
+
+	/** The Elite config if {@code target} is an Elite player, else null. Every AI hook starts here, so non-Elite targets cost one map lookup. */
+	private static PdConfig.@Nullable EliteAi eliteAiFor(@Nullable Entity target) {
+		if (!(target instanceof ServerPlayer player)) {
+			return null;
+		}
+		PdRuntime rt = PdRuntime.get();
+		if (rt == null || rt.modeOf(player.getUUID()) != PersonalDifficultyMode.ELITE) {
+			return null;
+		}
+		return rt.config().eliteAi();
+	}
+
+	/** Distance beyond which a mob gives up hunting {@code target}. */
+	public static double pursuitDistance(@Nullable LivingEntity target, double vanilla) {
+		PdConfig.EliteAi ai = eliteAiFor(target);
+		return ai == null ? vanilla : EliteSurvival.cappedRange(vanilla, EliteSurvival.pursuitFactor(ai));
+	}
+
+	/** How long (ticks) a mob remembers {@code target} while it cannot see it. */
+	public static int targetMemoryTicks(@Nullable LivingEntity target, int vanilla) {
+		PdConfig.EliteAi ai = eliteAiFor(target);
+		return ai == null || !ai.improvedPursuit() ? vanilla : EliteSurvival.memoryTicks(vanilla, ai.targetMemoryMultiplier());
+	}
+
+	/** Path-search length for a mob that is currently hunting an Elite player (its follow-range attribute is untouched). */
+	public static float maxPathLength(Mob mob, float vanilla) {
+		PdConfig.EliteAi ai = eliteAiFor(mob.getTarget());
+		return ai == null ? vanilla : (float) EliteSurvival.cappedRange(vanilla, EliteSurvival.pursuitFactor(ai));
+	}
+
+	/** Melee mobs' "should I start chasing?" re-check delay. */
+	public static long meleeRecheckTicks(Mob mob, long vanilla) {
+		PdConfig.EliteAi ai = eliteAiFor(mob.getTarget());
+		return ai == null || !ai.improvedPursuit() ? vanilla : Math.min(vanilla, EliteSurvival.ELITE_MELEE_RECHECK_TICKS);
+	}
+
+	/** Skeleton-family bow cadence against an Elite target: the vanilla Hard interval. */
+	public static int bowInterval(Mob mob, int vanilla) {
+		PdConfig.EliteAi ai = eliteAiFor(mob.getTarget());
+		if (ai == null || !ai.advancedCombat() || !(mob instanceof AbstractSkeleton skeleton)) {
+			return vanilla;
+		}
+		return EliteSurvival.bowInterval(vanilla, ((AbstractSkeletonAccess) skeleton).personaldifficulty$hardAttackInterval());
+	}
+
+	/**
+	 * Second-chance acquisition for an idle mob whose vanilla search found nothing: the nearest ELITE player within the
+	 * extended range that passes the very same {@link TargetingConditions} (line of sight, visibility incl. sneaking and
+	 * heads, invisibility, selectors, {@code canAttack}) evaluated at the larger radius. Only Elite players are candidates,
+	 * so Normal, Easy, Hard and Peaceful players are never affected.
+	 */
+	public static @Nullable ServerPlayer extendedAcquisition(Mob mob, TargetingConditions vanillaConditions, double vanillaRange) {
+		PdRuntime rt = PdRuntime.get();
+		if (rt == null || !(mob.level() instanceof ServerLevel level)) {
+			return null;
+		}
+		PdConfig.EliteAi ai = rt.config().eliteAi();
+		double extended = EliteSurvival.cappedRange(vanillaRange, ai.acquisitionRangeMultiplier());
+		if (extended <= vanillaRange) {
+			return null;
+		}
+		TargetingConditions conditions = vanillaConditions.copy().range(extended);
+		double limit = extended * extended;
+		ServerPlayer best = null;
+		double bestDistance = Double.MAX_VALUE;
+		for (ServerPlayer candidate : level.players()) {
+			if (rt.modeOf(candidate.getUUID()) != PersonalDifficultyMode.ELITE) {
+				continue;
+			}
+			double distance = mob.distanceToSqr(candidate.getX(), candidate.getEyeY(), candidate.getZ());
+			if (distance > limit || distance >= bestDistance) {
+				continue;
+			}
+			if (conditions.test(level, mob, candidate)) {
+				best = candidate;
+				bestDistance = distance;
+			}
+		}
+		return best;
 	}
 }

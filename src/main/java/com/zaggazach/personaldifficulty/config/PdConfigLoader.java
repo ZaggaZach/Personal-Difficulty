@@ -101,12 +101,20 @@ public final class PdConfigLoader {
 			num(p, "easy.ranged-min-uncertainty", d.easyRangedMinUncertainty(), 0, PdConfig.MAX_UNCERTAINTY, warnings),
 			num(p, "elite.ranged-max-uncertainty", d.eliteRangedMaxUncertainty(), 0, PdConfig.MAX_UNCERTAINTY, warnings),
 			num(p, "elite.armor-effectiveness", d.eliteArmorEffectiveness(), 0, 1, warnings),
+			num(p, "elite.natural-regeneration-multiplier", d.eliteRegenMultiplier(), PdConfig.MIN_REGEN_MULTIPLIER, 1, warnings),
 			num(p, "pvp.damage-multiplier", d.pvpDamageMultiplier(), 0, max, warnings),
 			num(p, "self.damage-multiplier", d.selfDamageMultiplier(), 0, max, warnings),
 			bool(p, "environmental.apply-profile", d.environmentalApplyProfile(), warnings),
 			bool(p, "void.apply-profile", d.voidApplyProfile(), warnings),
 			bool(p, "admin.apply-profile", d.adminApplyProfile(), warnings),
-			mobs
+			mobs,
+			new PdConfig.EliteAi(
+				num(p, "elite.ai.acquisition-range-multiplier", d.eliteAi().acquisitionRangeMultiplier(), 1, PdConfig.MAX_AI_RANGE_MULTIPLIER, warnings),
+				num(p, "elite.ai.follow-range-multiplier", d.eliteAi().followRangeMultiplier(), 1, PdConfig.MAX_AI_RANGE_MULTIPLIER, warnings),
+				bool(p, "elite.ai.improved-pursuit", d.eliteAi().improvedPursuit(), warnings),
+				num(p, "elite.ai.target-memory-multiplier", d.eliteAi().targetMemoryMultiplier(), 1, PdConfig.MAX_MEMORY_MULTIPLIER, warnings),
+				bool(p, "elite.ai.advanced-combat", d.eliteAi().advancedCombat(), warnings)
+			)
 		);
 		return new Result(config, List.copyOf(warnings), false);
 	}

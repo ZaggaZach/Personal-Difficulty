@@ -9,7 +9,7 @@ which difficulties may be chosen.
 | **Normal** | Plain vanilla (the default for everyone). |
 | **Easy** | 60 % of the damage, half the hunger, enemy archers aim worse. |
 | **Hard** | 125 % of the damage, 125 % hunger. |
-| **Elite** | A serious survival challenge: weaker armour, double damage, double hunger, sharper enemy archers. |
+| **Elite** | A serious survival challenge: weaker armour, double damage, double hunger, half-speed natural healing, sharper archers and sharper hunters. |
 | **Peaceful** | A personal safe mode: no damage (except the void and `/kill`), mobs ignore you, no hunger, no PvP either way. |
 
 The world's actual difficulty is **never changed** by this mod. Different players can use different
@@ -92,6 +92,49 @@ Order of operations for an Elite player's incoming hit (each step applies exactl
 world difficulty scaling (vanilla) → shield → **armour at 60 % effectiveness** → Resistance → Protection enchantments →
 **×2.0** → absorption hearts → health. Invulnerability frames compare the *raw* damage, exactly as in vanilla.
 
+#### Slower natural healing (1.2.0)
+| Setting | Default | Meaning |
+|---|---|---|
+| `elite.natural-regeneration-multiplier` | **0.50** | Natural regeneration runs at this fraction of vanilla speed (0.1 to 1.0; 1.0 = vanilla). |
+
+Vanilla heals from a tick counter inside `FoodData`: every **10 ticks** while you are saturated (food 20 with some
+saturation) and every **80 ticks** when merely well fed (food 18+). Elite stretches that interval to `round(interval / m)`,
+so the default gives 20 and 160 ticks: **exactly half the rate** in both cases, measured at 1-2.4-5.0 saturation and at
+food 18, 19 and 20. The amount per heal and the exhaustion charged per heal are unchanged, so the same food buys the same
+number of heals, only twice as slowly (with the Elite hunger multiplier on top, each of those heals costs 2x exhaustion as
+before). Other multipliers are rounded to whole ticks (0.25 gives 40/320).
+Only *natural* regeneration is affected. Not touched: the Regeneration and Instant Health effects, golden apples,
+potions, absorption, beacons, `/effect`, `/damage` and the `naturalRegeneration` game rule, which the mod never reads or
+changes (if you switch it off nobody regenerates, as before). The starvation damage timer is untouched. The rate is
+read from the player's *current* mode every tick, so it changes the moment they switch mode, survives death, respawn and
+reconnect, and there is nothing to bank by toggling (tested at switch periods of 1, 2, 3 and 7 ticks).
+
+#### Smarter hostile mobs (1.2.0)
+While an **Elite** player is the one being hunted, supported hostile mobs behave a little more like a determined hunter.
+Nothing is changed for other players, nothing is a global mob buff, and **no attribute is ever modified** - every effect is
+computed from the mob's current target, so it disappears the moment the target changes, the player leaves Elite (including
+for Peaceful) or the mob dies. Nothing sees through walls and nothing is given extra damage.
+
+| Setting | Default | Effect | Verified by a live-AI test? |
+|---|---|---|---|
+| `elite.ai.acquisition-range-multiplier` | **1.25** | An idle mob may notice an Elite player out to this multiple of its own follow range (1.0 = off, max 2.0). Line of sight, sneaking/head-gear/invisibility rules, selectors and `canAttack` still apply; Peaceful players are never candidates. | yes: zombie, husk, skeleton, stray, creeper, vindicator, pillager |
+| `elite.ai.follow-range-multiplier` | **1.25** | A mob keeps hunting an Elite player, and its pathfinder searches for a route, out to this multiple (1.0 = off, max 2.0; the larger of this and the acquisition multiplier is used so that a target is never acquired and dropped on the next tick). | yes: zombie (target held, complete route found, closes in) |
+| `elite.ai.improved-pursuit` | **true** | Master switch for the next setting and for a shorter melee "start chasing" re-check (5 instead of 20 ticks). | memory: yes (zombie); re-check: **hook-level only** |
+| `elite.ai.target-memory-multiplier` | **2.0** | A mob forgets an Elite target it cannot see after 2x as long (vanilla 60 ticks; max 4.0, never above 400 ticks). | yes: zombie, 61 vs 122 ticks |
+| `elite.ai.advanced-combat` | **true** | Skeleton-family bow cadence against Elite players is the vanilla *Hard* cadence (20 ticks between shots instead of 40) even in an Easy/Normal world. | yes: skeleton, 6 vs 9 arrows in 350 ticks |
+
+No Elite adjustment ever reaches beyond **64 blocks** (unless the mob's own vanilla range is larger). Ranges are never
+shrunk. If the world is already on Hard, the bow setting changes nothing (the cadence is the same). The existing
+`elite.ranged-max-uncertainty` still governs *aim*.
+
+Which mobs are covered: the acquisition, pursuit and memory hooks sit in the vanilla goals every "nearest player"
+hostile uses (`NearestAttackableTargetGoal`, `TargetGoal`, `PathNavigation`), so any mob built on them is covered by
+construction, but only the mobs in the table were actually run through the live AI and **only those are claimed**. Not
+claimed (not tested, or known not to apply): spiders and cave spiders (their own night-only goal), witches (a live test
+found no extended acquisition - not supported), endermen (provoked by gaze), phantoms, drowned, guardians, piglin-family
+and hoglins, the Warden, the Ender Dragon, blazes, ghasts, breezes, the Wither, illagers other than the vindicator and
+pillager, zombified piglins, and all modded mobs.
+
 Elite does not weaken attacks against other players, does not touch PvP, self-inflicted, void or `/kill` damage
 (same exceptions as Easy and Hard), and never changes any mob globally.
 
@@ -137,7 +180,7 @@ server policy, completely separate from players' saved choices:
 
 `<server>/config/personaldifficulty.properties` (created with comments on first start). Invalid values (not a number,
 NaN, infinity) fall back to the default; out-of-range values are clamped (multipliers 0.0 to 10.0, uncertainty 0 to 60,
-armour effectiveness 0 to 1); every problem is logged. Edit, then `/personaldifficulty admin reload`.
+armour effectiveness 0 to 1, regeneration 0.1 to 1, AI ranges 1 to 2, memory 1 to 4); every problem is logged. Edit, then `/personaldifficulty admin reload`.
 
 ```properties
 easy.damage-multiplier=0.60
@@ -160,6 +203,12 @@ ranged.drowned=true
 ranged.crossbow-mobs=true           # pillagers
 ranged.piglins=true
 ranged.witches=true
+elite.natural-regeneration-multiplier=0.50   # 0.1 .. 1.0, fraction of vanilla natural healing speed
+elite.ai.acquisition-range-multiplier=1.25   # 1.0 .. 2.0
+elite.ai.follow-range-multiplier=1.25        # 1.0 .. 2.0
+elite.ai.improved-pursuit=true
+elite.ai.target-memory-multiplier=2.0        # 1.0 .. 4.0
+elite.ai.advanced-combat=true
 #easy.damage-type.minecraft.fall=0.3   # optional per-damage-type override (easy|hard|elite)
 ```
 
@@ -190,6 +239,13 @@ The `players.json` format did not change, so there is **no rewrite on upgrade**:
 
 ## Limitations
 
+* **Elite hostile-mob behaviour is not a full AI rewrite.** It widens notice/chase radius, extends the pathfinder's search
+  length and target memory, and speeds skeleton bow cadence, for the mobs listed above. It does not add flanking,
+  coordinated groups, door-breaking, dodging or ranged-mob kiting, and the shorter melee re-check is not measured by a
+  live-AI test. A mob that cannot see you still cannot notice you.
+* **Elite healing is slower, not different.** Regeneration is slowed by stretching the vanilla timer; a player can
+  still out-heal damage with golden apples, potions, Regeneration and beacons, which are deliberately untouched.
+
 * **Ranged aim** is adjusted for: skeleton and stray (tested; bogged, parched and wither skeletons inherit the same
   vanilla method but are untested), illusioner, drowned (tridents), pillager (crossbow), piglin (crossbow, brain-driven;
   needed a dedicated hook) and witch (potions; vanilla witches always use uncertainty 8). **Not** adjusted: wither,
@@ -212,8 +268,8 @@ The `players.json` format did not change, so there is **no rewrite on upgrade**:
 ## Building from source
 
 ```
-./gradlew build            # compiles and runs the 78 unit tests -> build/libs/personal-difficulty-<version>.jar
-./gradlew runGameTest      # 61 in-server integration tests (real ServerPlayer / mobs / mixins)
+./gradlew build            # compiles and runs the 89 unit tests -> build/libs/personal-difficulty-<version>.jar
+./gradlew runGameTest      # 86 in-server integration tests (85 of ours + the framework's always_pass) (real ServerPlayer / mobs / mixins)
 ./gradlew runServer        # local dev server in run/ (accept the EULA in run/eula.txt first)
 ```
 

@@ -10,6 +10,7 @@ import com.zaggazach.personaldifficulty.PdHooks;
 import com.zaggazach.personaldifficulty.PdRuntime;
 import com.zaggazach.personaldifficulty.PersonalDifficultyMode;
 import com.zaggazach.personaldifficulty.config.PdConfig;
+import com.zaggazach.personaldifficulty.logic.EliteSurvival;
 import com.zaggazach.personaldifficulty.store.AvailabilityPolicy;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -198,11 +199,24 @@ public final class PdCommands {
 				c.hard().damageMultiplier(), c.hard().hungerMultiplier(),
 				c.pvpDamageMultiplier(), c.selfDamageMultiplier(), applied(c.voidApplyProfile()), applied(c.adminApplyProfile()), applied(c.environmentalApplyProfile()));
 			case ELITE -> String.format(Locale.ROOT,
-				"Armour is only %.0f%% as effective, then incoming damage x%.2f (after resistance/enchantments, before absorption; each applied once), hunger x%.2f, supported ranged attackers aim with at most uncertainty %.2f. PvP x%.2f, self x%.2f, void %s, admin %s, environmental %s.",
+				"Armour is only %.0f%% as effective, then incoming damage x%.2f (after resistance/enchantments, before absorption; each applied once), hunger x%.2f, supported ranged attackers aim with at most uncertainty %.2f, natural regeneration at x%.2f speed (Regeneration, healing and absorption unchanged). Hostile mobs hunting you: %s. PvP x%.2f, self x%.2f, void %s, admin %s, environmental %s.",
 				c.eliteArmorEffectiveness() * 100, c.elite().damageMultiplier(), c.elite().hungerMultiplier(), c.eliteRangedMaxUncertainty(),
+				c.eliteRegenMultiplier(), describeEliteAi(c.eliteAi()),
 				c.pvpDamageMultiplier(), c.selfDamageMultiplier(), applied(c.voidApplyProfile()), applied(c.adminApplyProfile()), applied(c.environmentalApplyProfile()));
 			case PEACEFUL -> "You take no damage except from the void and /kill, hostile mobs will not target you, you lose no hunger, harmful effects are blocked, and you cannot damage other players (nor they you).";
 		};
+	}
+
+	private static String describeEliteAi(PdConfig.EliteAi ai) {
+		StringBuilder sb = new StringBuilder(String.format(Locale.ROOT, "notice you from x%.2f and give chase up to x%.2f of their vanilla range (never through walls)",
+			ai.acquisitionRangeMultiplier(), EliteSurvival.pursuitFactor(ai)));
+		if (ai.improvedPursuit()) {
+			sb.append(String.format(Locale.ROOT, ", remember you x%.1f longer out of sight, re-check melee chases faster", ai.targetMemoryMultiplier()));
+		}
+		if (ai.advancedCombat()) {
+			sb.append(", skeleton-family archers shoot at the Hard rate");
+		}
+		return sb.toString();
 	}
 
 	private static String applied(boolean on) {

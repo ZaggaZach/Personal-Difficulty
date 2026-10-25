@@ -1,4 +1,148 @@
-# Verification report: Personal Difficulty 1.1.0
+# Verification report: Personal Difficulty 1.2.0
+
+Status keys: **PASS** = executed here and passed. **NOT RUN** = not executed here. **NOT IMPLEMENTED** = deliberately absent.
+Nothing is claimed beyond what was run. 1.2.0 changes only Elite (natural regeneration and hostile-mob behaviour); everything
+else is the 1.1.0 behaviour, re-run by the same regression suites. The 1.1.0 report is kept below as Appendix.
+
+## 1. Toolchain
+Unchanged from 1.1.0: Minecraft 26.3, Fabric Loader 0.20.1, Fabric API 0.165.0+26.3, Loom 1.19.3, Gradle 9.8.2, Temurin
+25.0.5+8.
+
+## 2. Final results (branch `feature/1.2.0-elite-survival`, from `737652a`)
+
+### 2.1 Build and unit tests: **PASS 89 / 89** (0 failed, 0 skipped)
+`./gradlew clean build` -> BUILD SUCCESSFUL. AvailabilityPolicy 13, DamageAdjuster 17, **EliteSurvival 11 (new)**, HungerAndAim 13,
+Migration 10, ModeAndConfig 11, PeacefulRules 6, PlayerSettings 8. New: interval stretching maths and rounding (0.5, 0.25, 0.1,
+1.0, invalid inputs), range cap (never shrinks, 64-block cap, NaN/infinity), pursuit factor, memory cap, bow cadence,
+defaults, and validation/clamping of every new config key.
+
+### 2.2 In-server tests: **PASS 86 / 86** (85 ours + the framework's `always_pass`), 0 failed
+General/1.0.0 regression 19, Elite 12, restrictions 9, Peaceful 13, Peaceful AI 7 (the 60 from 1.1.0, all still passing),
+**Elite regeneration 11 (new)**, **Elite AI 14 (new)**. The complete suite was run at the final state **3 times in a row with
+no failure** after the last code change (many more full runs happened during development, several with failures that were test bugs, see 2.6).
+
+### 2.3 What the new tests prove
+
+Test types: `ai_*` = real, unmodified vanilla goal AI of live mobs running for many ticks, only starting positions, a wall
+or a mode switch injected. `direct_*` = hook called directly on an un-ticked mob (wiring only). Regeneration tests call the
+real `FoodData.tick` (directly and through the real per-tick `ServerPlayer` path) with food/saturation held by the test.
+
+**Natural regeneration (HP gained from 1 HP; Normal | Elite):**
+
+| Case | Normal | Elite | Ratio |
+|---|---|---|---|
+| food 20, saturation 5.0, 160 ticks | 13.333 | 6.667 | 0.500 |
+| food 20, saturation 2.4 | 6.400 | 3.200 | 0.500 |
+| food 20, saturation 0.6 | 1.600 | 0.800 | 0.500 |
+| food 20 / 19 / 18, no (or low) saturation, 480 ticks | 6.000 | 3.000 | 0.500 |
+| food 17, 10, 0 | 0 | 0 | no natural regeneration in vanilla either |
+
+* Easy, Hard and Peaceful heal exactly like Normal. Through the real per-tick path Elite is also exactly half.
+* Same food buys the same number of heals (2 and 2 from food 19), the last one at tick 160 vs 320 (twice as slowly); with the
+  Elite hunger multiplier on, each Elite heal charges exactly 2x exhaustion (the pre-existing 1.1.0 setting, shown separately).
+* `LivingEntity.heal`, Instant Health I and II, the Regeneration effect (150 ticks) and Absorption are identical for Elite and Normal.
+* Game rule `naturalRegeneration` off: nobody regenerates, mode switches while it is off neither enable regeneration nor change
+  the rule; the rule is never modified by the mod (checked before and after).
+* Mode switches take effect at once in both directions (Normal -> Elite -> Normal -> Peaceful). Toggling Elite/Normal every 1, 2, 3
+  or 7 ticks for 150 ticks stays between the pure-Normal and pure-Elite result (no exploit). Death + respawn (new `FoodData`)
+  and disconnect + reconnect keep the Elite pace; leaving Elite restores vanilla immediately.
+* Custom multipliers 0.25, 0.2, 0.1, 0.5 are honoured within whole-tick rounding (6 %) after a live reload; 1.0 = vanilla; `NaN`
+  falls back to 0.5. Peaceful after Elite: still no damage, vanilla regeneration with no hunger cost, and Elite damage x2 returns at once.
+
+**Hostile-mob behaviour (live AI; control lane = Normal player with the same mob type at the same relative distance):**
+
+| Mob | Vanilla follow range* | Player at | Normal lane acquisitions beyond range | Elite lane: acquired beyond range (at most 1.25x) |
+|---|---|---|---|---|
+| zombie | 35.7 | 39.9 | 0 | yes (1; max distance 40.0) |
+| husk | 32.8 | 36.7 | 0 | yes |
+| skeleton | 15.9 | 17.8 | 0 | yes |
+| stray | 15.6 | 17.5 | 0 | yes |
+| creeper | 17.3 | 19.4 | 0 | yes |
+| vindicator | 11.7 | 13.2 | 0 | yes |
+| pillager | 34.3 | 38.4 | 0 | yes |
+
+\* vanilla gives every spawned mob its own random follow-range bonus, so each lane uses its own mob's range; values shown are one run.
+In every test neither mob had any Personal Difficulty attribute modifier (FOLLOW_RANGE, MOVEMENT_SPEED, ATTACK_DAMAGE).
+
+* **No wallhack:** a zombie with a solid wall between it and an Elite player inside the extended range never acquires them
+  (0 ticks); an Elite player at 1.3x vanilla range (beyond the 1.25x acquisition range) is never acquired (0 ticks).
+* **Pursuit (zombie):** both players start at 0.6x range and are acquired autonomously, then are moved to 1.12x range from where
+  their hunter stands. The Normal zombie drops the target within 3 ticks; the Elite zombie keeps it, its pathfinder returns a
+  *complete* route (vanilla: partial), and over 150 ticks it closed from 38.0 to 20.5 blocks while the Normal one stayed at 37.6.
+* **Memory (zombie):** after a wall hides the player, the Normal zombie forgets after **61-62 ticks**, the Elite zombie after
+  **121-122**; a player who leaves Elite at the moment of hiding is forgotten after 62 (no stale state).
+* **Bow cadence (skeleton, 350 ticks, same distance):** 6 arrows at a Normal player, 9 at an Elite player (1.5x, because the
+  draw time is unchanged; below the 2x of the interval alone).
+* **Peaceful compatibility:** a Peaceful player 0.5x range away is never targeted by a live zombie; an Elite player whose zombie
+  acquired them at extended range is dropped within 3 ticks of switching to Peaceful and never re-targeted.
+* **Performance (informational, noisy test server):** 100 idle zombies with a player 62 blocks away (outside even the extended
+  range): mean server tick 17.7 ms while Normal vs 14.5 ms while Elite in 100-tick alternating phases (JIT warm-up dominates; no
+  measurable Elite cost); none of the zombies hunted. The test asserts only that ticks stay far below the 50 ms budget.
+* **Direct (wiring only, un-ticked mob):** the hooks return vanilla values for Normal and Peaceful targets and the Elite values
+  for an Elite target (`direct_hooks_returnVanillaForEveryoneButElite`).
+
+### 2.4 Mutation checks: **PASS**
+With one mixin removed at a time, the suite fails exactly where expected: without `PathNavigationMixin` the pursuit test
+("route to the same distance is a complete one") fails; without `RangedBowAttackGoalMixin` the bow-cadence test fails; without
+`TargetGoalMixin` the pursuit, memory and Peaceful-drop tests fail; without `FoodDataMixin` every regeneration test and the
+1.1.0 hunger tests fail. A first version of the pursuit test passed even without the path hook (a zombie in open ground
+still walks toward a partial path), so the route-completeness assertion was added: it is the evidence for that hook.
+**Not covered by any mutation or live-AI measurement:** `MeleeAttackGoalMixin` (the shorter melee re-check).
+
+### 2.5 Standalone dedicated-server smoke test of the final JAR: **PASS**
+`personal-difficulty-1.2.0.jar` (+ Fabric API) in `mods/` of a genuine Fabric server (launcher, Loader 0.20.1, MC 26.3, Java 25),
+loopback, offline mode, disposable world on Hard, driven from the console (three sessions):
+* the mod loads, all 19 mixins apply (`defaultRequire` would abort startup otherwise), no exception in any log, clean shutdown;
+* an existing 1.1.0-style config (no new keys) loads with defaults; a missing config is created including the six new keys;
+* invalid values are rejected with logged warnings: on the final JAR `abc` -> default and `99` -> clamped to 4.0; `9` -> clamped to 2.0, `0.2` -> clamped to 1.0, `NaN` and `maybe` -> default were observed in an earlier session on the previous build (the config loader was not changed afterwards; the unit tests cover all of them);
+* `admin config` describes the new Elite behaviour from the live values; `admin reload`, `disable elite`, `enable all`,
+  `difficulties` work (checked on the final JAR); `/difficulty` stays **Hard** throughout (never changed);
+* the existing `players.json` (with an unknown-mode entry) loads exactly as in 1.1.0.
+NOT done in this test: a real player joining (see 3).
+
+### 2.6 Notes on test development (honesty log)
+* Development runs before the final state included failures that were test bugs, fixed and re-run: the Instant Health effect
+  needs a tick to apply; the vanilla random follow-range bonus differs per mob, so lanes must use each mob's own range; mobs
+  wander, so acquisition is judged at the moment of acquisition and mobs are kept on small islands; acquisition has a random
+  delay, so premise checks wait longer.
+* A first witch acquisition test found **no** extended acquisition; witches were removed from the claim rather than patched around.
+* GameTest `@GameTest` has no batch option: each AI test builds its own platform 100 blocks up and 200 blocks apart.
+
+### 2.7 JAR inspection: **PASS**
+`build/libs/personal-difficulty-1.2.0.jar`, **84,942 bytes**, sha256 `d34f8a9875e56270abb81e25ace5e9923338ef7c99e96f883483d76ae8a6a4a5`
+45 classes (19 mixins), `fabric.mod.json` (`environment: server`, `minecraft ~26.3`, `fabricloader >=0.20.1`, `java >=25`,
+`fabric-api *`, version 1.2.0), mixin config (`defaultRequire: 1`, 19 mixins), default config, MIT licence. Class files are Java 25
+(major 69). No `net.minecraft.client` references, no gametest classes, no bundled Loader/Fabric API/Gson. The source contains no
+call that sets the world difficulty. The 1.0.0 and 1.1.0 release folders are unmodified.
+
+## 3. NOT RUN
+* **A real Minecraft client connecting.** No client is available here; nothing is claimed about real-client behaviour
+  (animation of slower healing, how hunting mobs look, command suggestions).
+* **Live AI for any mob not in the table in 2.3**, in particular: witches (not supported), spiders, drowned, bogged, parched,
+  wither skeletons, piglins, hoglins, the Warden, the Ender Dragon, blazes, ghasts, breezes, endermen, phantoms, guardians, zombified
+  piglins, zombie villagers and modded mobs. Bow cadence was tested for the skeleton only (the stray and the other skeleton
+  variants use the same code; not run).
+* The shorter **melee re-check** (`MeleeAttackGoalMixin`): wired and applied at startup, hook returns the expected value
+  (direct test), but no live-AI measurement shows an effect.
+* Multi-player crowds, nether/end behaviour, interaction with other mods that change mob targeting, long-running soak tests,
+  multi-hour play-testing of the balance.
+* Publishing: no push, pull request, tag, release or Modrinth upload was made.
+
+## 4. NOT IMPLEMENTED
+Flanking, group coordination, door breaking, dodging/kiting, per-mob tuning, any Elite change for mobs that do not use the
+vanilla `NearestAttackableTargetGoal`/`TargetGoal`/`PathNavigation`, raising Elite mob damage or speed.
+
+## 5. Remaining risks and recommended practical tests
+1. Real-client behaviour is unverified; join with an unmodified client and watch healing (hearts should refill about twice as slowly).
+2. Elite is now much harder; the numbers are a design estimate. Try a normal play session and adjust `elite.natural-regeneration-multiplier`
+   (0.5 -> 0.7) and `elite.ai.*` if it is too much.
+3. Open-field test: stand 40 blocks from a zombie, then a skeleton at 18 blocks, in daylight with line of sight, as Elite and as Normal.
+4. Cave test: confirm mobs behind walls do not pick you out through terrain.
+5. Mob farms/spawners next to an Elite player may produce more hunters at once; watch server tick time with a farm running.
+6. Mods that replace targeting goals may bypass or conflict with the hooks.
+
+# Appendix: Verification report for 1.1.0 (retained unchanged)
+
 
 Status keys: **PASS** = executed here and passed. **NOT RUN** = not executed here. **NOT IMPLEMENTED** = deliberately absent.
 Nothing below is claimed beyond what was run. Sections 8 and 9 are the ones to read before relying on the mod.

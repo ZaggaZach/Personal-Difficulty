@@ -116,3 +116,56 @@ are kept verbatim; unreadable files are copied to `*.backup-<time>` before anyth
 * Config: immutable record swapped on reload. Selections: `ConcurrentHashMap<UUID, Mode>`, written atomically only on change.
 * `mixins.json` uses `defaultRequire: 1`: if a target changes in a future Minecraft version the server fails loudly at
   startup instead of silently losing a feature (13 mixins).
+
+## Elite survival (1.2.0)
+
+### Natural regeneration
+`FoodData.tick(ServerPlayer)` regenerates on one shared counter `tickTimer`: with food 20, saturation > 0 and the player hurt,
+every time the counter reaches **10** it heals `min(saturation, 6) / 6` HP and charges `min(saturation, 6)` exhaustion; with
+food >= 18 (and not in that first branch) every time it reaches **80** it heals 1 HP and charges 6 exhaustion; at food 0 the
+same counter reaches 80 for starvation damage. Both heal branches require the `naturalRegeneration` game rule to be on.
+Options considered: (a) scale the healed amount - rejected, it changes how the exhaustion cost per HP relates to the heal and
+creates fractional-health quirks; (b) cancel some ticks - rejected, needs per-player state and can be exploited by toggling;
+(c) **stretch the two interval constants** - chosen. The two constants are replaced through `@ModifyExpressionValue` on the
+`CONSTANT 10` / `CONSTANT 80` of the regeneration branches (ordinal 0; the starvation `80` is a different ordinal and is
+untouched). The new interval is `max(vanilla, round(vanilla / m))` from the player's *current* mode, so it is stateless:
+nothing to clear on a mode change, nothing to persist, nothing to exploit (a toggle between Elite and Normal every 1-7 ticks
+lands between the pure-Normal and pure-Elite results). Amount per heal and exhaustion per heal are the vanilla code, so the
+same food buys the same number of heals. The `naturalRegeneration` rule is checked by vanilla before this code is reached.
+Healing that does not go through that branch (`LivingEntity.heal` callers such as golden apples, the Regeneration and
+Instant Health effects, commands) is never intercepted.
+
+### Hostile-mob architecture and what was hooked
+Vanilla hostile-mob targeting is goal-based: `NearestAttackableTargetGoal<Player>` finds a target with a
+`TargetingConditions` (range = `FOLLOW_RANGE` attribute, line of sight, visibility, selector, `canAttack`) and
+`TargetGoal.canContinueToUse` keeps it while the target is alive, within the follow distance and not unseen for
+`unseenMemoryTicks` (60). `PathNavigation.getMaxPathLength` is the `FOLLOW_RANGE` attribute, and `MeleeAttackGoal.canUse`
+throttles with a 20-tick re-check. Skeleton-family archers use `RangedBowAttackGoal` with an interval set by difficulty.
+
+| Concern | Hook | Evaluated from | Notes |
+|---|---|---|---|
+| Acquisition | `NearestAttackableTargetGoal.findTarget` (RETURN): if vanilla found nothing and the goal targets players, re-run the goal's own `TargetingConditions.copy().range(extended)` against **Elite** players only | the candidate's mode | line of sight, sneaking/head-gear, invisibility, selector and `canAttack` all still apply; cap 64 |
+| Keep hunting | `TargetGoal.canContinueToUse`: the follow-distance read and `unseenMemoryTicks` read | the current target's mode | pursuit factor = max(follow, acquisition) |
+| Route search | `PathNavigation.getMaxPathLength` | the mob's current target's mode | the attribute itself is untouched |
+| Melee re-check | `MeleeAttackGoal.canUse` constant 20 | the mob's current target's mode | |
+| Bow cadence | `RangedBowAttackGoal.tick` reads `attackIntervalMin` | the mob's current target's mode | `min(current, Hard interval)` |
+
+Rejected: attribute modifiers on mobs (would be a global buff, linger after the target changes, and be visible to other
+mods/commands); scanning every mob each tick (cost); wall-penetrating or radius-only detection (would be a wallhack). Because
+everything is a function of the *current target's current mode*, there is no state to go stale: switch to Peaceful and the very
+next goal check drops the target (Peaceful's existing targeting gate), switch to Normal and ranges, memory and cadence are vanilla
+on the next tick.
+
+### Cost
+The only new per-mob work is the second-chance search, which runs only when the vanilla search already found nothing and only
+if there is at least one Elite player in the level; it loops over the level's players with a squared-distance early-out before
+any line-of-sight test. Idle mobs only do it at the goal's own search interval (every ~10 ticks). Measured: 100 idle zombies
+with an Elite player just outside the extended range showed no measurable change in mean tick time (see VERIFICATION.md).
+
+### Mob classification
+Verified in live AI (autonomous goal selector, no injected targets): zombie, husk, skeleton, stray, creeper, vindicator,
+pillager (acquisition); zombie (pursuit, route, memory); skeleton (bow cadence). Same code path but untested: drowned,
+zombie villager, bogged, parched, wither skeleton, other illagers, zoglin-like melee mobs that use the same goals. Own targeting,
+not covered or not claimed: spiders (night-only goal), witches (live test found no extended acquisition), endermen, piglins
+and hoglins (brain-driven), the Warden (sensor-driven), the Ender Dragon, blazes, ghasts, breezes, phantoms, guardians,
+the Wither, zombified piglins, modded mobs.

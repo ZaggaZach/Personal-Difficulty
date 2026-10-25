@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.2.0
+
+Minecraft 26.3, Fabric Loader 0.20.1+, Fabric API 0.165.0+26.3, Java 25. Server-side only. Drop-in upgrade from 1.1.0:
+existing `players.json`, availability file and `personaldifficulty.properties` keep working (missing keys take their
+defaults; nothing is rewritten). Only **Elite** changes.
+
+### Added
+* **Elite natural regeneration at half speed** (`elite.natural-regeneration-multiplier`, default 0.50, 0.1 to 1.0): the vanilla
+  regeneration intervals (10 / 80 ticks) are stretched; amount per heal and hunger cost per heal are unchanged. Regeneration
+  and Instant Health effects, golden apples, absorption and the `naturalRegeneration` game rule are untouched. Immediate on
+  mode switch; survives respawn and reconnect.
+* **Elite-specific hostile mob behaviour** (`elite.ai.*`): wider notice range (1.25x, respecting line of sight and
+  visibility), longer chase range and pathfinding (1.25x), target memory 2x, shorter melee re-check, skeleton-family bow
+  cadence of Hard difficulty. Target-specific; no attribute is modified; Peaceful players are never affected.
+* 6 new config keys, validated like the others (invalid -> default, out of range -> clamped, both logged).
+* 6 new mixins (19 in total): `NearestAttackableTargetGoal`, `TargetGoal`, `PathNavigation`, `MeleeAttackGoal`,
+  `RangedBowAttackGoal` and an accessor for the skeleton's Hard interval; `FoodDataMixin` gained the two regeneration hooks.
+* `/personaldifficulty admin config` and the server overview describe the new Elite behaviour.
+* Tests: 11 new unit tests (89 total) and 25 new in-server tests (85 + framework `always_pass`), including live-AI tests for
+  seven mob types, line-of-sight and range-cap checks, memory, pursuit, bow cadence, Peaceful compatibility and a
+  mutation check.
+
+### Not in this release (see README "Limitations" and docs/VERIFICATION.md)
+Live-AI verification for any mob not named there; a live-AI measurement of the shorter melee re-check; witches (the test
+found no extended acquisition); flanking/kiting/door-breaking; real-client testing.
+
 ## 1.1.0
 
 Minecraft 26.3, Fabric Loader 0.20.1+, Fabric API 0.165.0+26.3, Java 25. Server-side only.
