@@ -81,16 +81,26 @@ public final class PdConfigLoader {
 			num(p, "hard.hunger-multiplier", d.hard().hungerMultiplier(), 0, max, warnings),
 			overrides(p, "hard", warnings)
 		);
+		PdConfig.Profile elite = new PdConfig.Profile(
+			num(p, "elite.damage-multiplier", d.elite().damageMultiplier(), 0, max, warnings),
+			num(p, "elite.hunger-multiplier", d.elite().hungerMultiplier(), 0, max, warnings),
+			overrides(p, "elite", warnings)
+		);
 		PdConfig.RangedMobs mobs = new PdConfig.RangedMobs(
 			bool(p, "ranged.skeletons", d.rangedMobs().skeletons(), warnings),
 			bool(p, "ranged.illusioners", d.rangedMobs().illusioners(), warnings),
 			bool(p, "ranged.drowned", d.rangedMobs().drowned(), warnings),
-			bool(p, "ranged.crossbow-mobs", d.rangedMobs().crossbowMobs(), warnings)
+			bool(p, "ranged.crossbow-mobs", d.rangedMobs().crossbowMobs(), warnings),
+			bool(p, "ranged.piglins", d.rangedMobs().piglins(), warnings),
+			bool(p, "ranged.witches", d.rangedMobs().witches(), warnings)
 		);
 		PdConfig config = new PdConfig(
 			easy,
 			hard,
+			elite,
 			num(p, "easy.ranged-min-uncertainty", d.easyRangedMinUncertainty(), 0, PdConfig.MAX_UNCERTAINTY, warnings),
+			num(p, "elite.ranged-max-uncertainty", d.eliteRangedMaxUncertainty(), 0, PdConfig.MAX_UNCERTAINTY, warnings),
+			num(p, "elite.armor-effectiveness", d.eliteArmorEffectiveness(), 0, 1, warnings),
 			num(p, "pvp.damage-multiplier", d.pvpDamageMultiplier(), 0, max, warnings),
 			num(p, "self.damage-multiplier", d.selfDamageMultiplier(), 0, max, warnings),
 			bool(p, "environmental.apply-profile", d.environmentalApplyProfile(), warnings),

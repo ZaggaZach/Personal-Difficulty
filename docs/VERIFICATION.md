@@ -1,105 +1,171 @@
-# Verification report
+# Verification report: Personal Difficulty 1.1.0
 
-Status keys: **PASS** = executed and passed in this environment. **NOT RUN** = not executed here.
-**NOT IMPLEMENTED** = feature deliberately absent. Nothing below is claimed beyond what was run.
+Status keys: **PASS** = executed here and passed. **NOT RUN** = not executed here. **NOT IMPLEMENTED** = deliberately absent.
+Nothing below is claimed beyond what was run. Sections 8 and 9 are the ones to read before relying on the mod.
 
-## 1. Toolchain (verified, not assumed)
+## 1. Toolchain
 
-| Item | Value | Evidence |
-|---|---|---|
-| Minecraft | 26.3 (release, 2026-09-15) | Mojang version manifest `latest.release` = 26.3; Fabric meta lists `26.3` stable |
-| Required Java | 25 | 26.3 `javaVersion.majorVersion` = 25; built with Temurin 25.0.5+8 |
-| Fabric Loader | 0.20.1 | Fabric meta: newest stable (the brief's 0.19.5 is older; 0.20.1 matches the official example mod) |
-| Fabric API | 0.165.0+26.3 | Modrinth: newest release for 26.3 (2026-10-23); Maven has the artifact |
-| Fabric Loom | 1.19.3 plugin `net.fabricmc.fabric-loom` | Maven `release`; official template uses the 1.19 line |
-| Gradle | 9.8.2 | `services.gradle.org` current; official template wrapper |
-| Mappings | none (26.x is unobfuscated; Mojang names) | source jar from `genSources` uses Mojang names |
+| Item | Value |
+|---|---|
+| Minecraft | 26.3 (the only version tested or claimed) |
+| Fabric Loader | 0.20.1 |
+| Fabric API | 0.165.0+26.3 |
+| Fabric Loom | 1.19.3 (`net.fabricmc.fabric-loom`) |
+| Gradle | 9.8.2 |
+| Java | Temurin 25.0.5+8 (class files are Java 25, major 69) |
+| Mappings | none (26.x is unobfuscated); sources read via Loom `genSources` |
 
-## 2. Compilation and packaging
+## 2. Baseline before any change (branch `feature/1.1.0-elite-peaceful`, from commit `b13ef8c`)
 
-* **PASS** `./gradlew clean build` -> BUILD SUCCESSFUL.
-* **PASS** JAR `build/libs/personal-difficulty-1.0.0.jar` (46,504 bytes, sha256
-  `04f799e36cf8ae57a7d68c0523917fefcc483c93498caa889a075c0f6b19e32b`, also in `release/SHA256SUMS`). Inspected: `fabric.mod.json` (`environment: server`,
-  `minecraft ~26.3`, `fabricloader >=0.20.1`, `java >=25`, `fabric-api *`), mixin config, 25 classes (all
-  Java-25 bytecode, major 69), no `net.minecraft.client` references, no gametest classes, no bundled Loader
-  or Fabric API.
-* No `remapJar`: 26.x is unobfuscated, so the built jar is the production jar.
+**PASS** 37/37 unit tests and 19/19 mod GameTests (+ the framework's `always_pass`): the 1.0.0 baseline, run untouched.
 
-## 3. Automated unit tests (`./gradlew test`) - **PASS 37 / 37**, 0 failed, 0 skipped
+## 3. Final results
 
-ModeAndConfigTest 10, DamageAdjusterTest 10, HungerAndAimTest 9, PlayerSettingsTest 8. Pure logic only:
-mode parsing, INHERIT != NORMAL, defaults, NaN/Infinity/negative/huge/unparsable values, malformed file,
-missing file, reload policy, damage precedence and exceptions, exactly-once, no-heal/no-NaN, hunger maths
-(fractions preserved), spread maths, two-UUID persistence, restart, corrupt-file backup, rollback on failed
-save, per-world isolation.
+### 3.1 Build: **PASS**
+`./gradlew clean build runGameTest` -> BUILD SUCCESSFUL.
 
-## 4. In-server integration tests (`./gradlew runGameTest`) - **PASS 19 / 19** (+ the framework's own `always_pass`)
+### 3.2 Unit tests: **PASS 78 / 78** (0 failed, 0 skipped)
+AvailabilityPolicyTest 13, DamageAdjusterTest 17, HungerAndAimTest 13, MigrationTest 10, ModeAndConfigTest 11,
+PeacefulRulesTest 6, PlayerSettingsTest 8. Pure logic: modes (Inherit gone, legacy parse), config validation (NaN, infinity,
+negative, huge, malformed, Elite keys), migration (every legacy value, restart stability, no rewrite on load, unknown/partly
+corrupt/truncated/newer files, multiple UUIDs), availability policy (every mode on/off, last-one refusal, recovery, restart,
+reload, rollback, malformed/all-disabled files), damage precedence, Elite maths against replicated vanilla formulas (design
+table), hunger maths, aim maths, Peaceful decision matrix.
 
-Run inside a real Minecraft 26.3 server with the mod's mixins applied, using real `ServerPlayer` instances
-(placed, "client loaded", survival; mock players are otherwise invulnerable) and real mobs. Results:
-`build/reports/gametest/junit.xml`.
+### 3.3 In-server integration tests (`./gradlew runGameTest`): **PASS 60 / 60** (+ framework `always_pass` = 61)
+Real `ServerPlayer`s (survival, client-loaded, server-simulated), real mobs, projectiles, TNT, tamed wolves and live vanilla
+AI inside a Minecraft 26.3 server with all 13 mixins applied. Suites: general/1.0.0 regression 19, Elite 12, restrictions 9,
+Peaceful 13, Peaceful AI/targeting 7. Report: `docs/gametest-report.junit.xml`. The complete suite passed in **4 complete runs**: three at the pre-final state and once more at the final build (the only
+difference between them is a corrected comment in the default config template); during development one live-AI test failed once because
+its counter included a *neighbouring* arena's arrows (all arenas share one world) and was rewritten to track only that skeleton's
+own arrows and target; it has passed in every run since.
 
-* Damage: Easy x0.60 / Normal x1 / Inherit x1 / Hard x1.25 for fall, lava, fire, drowning, in-wall; applied
-  exactly once; real zombie melee equals 0.6 x a Normal player's loss (world scaling not re-applied);
-  diamond armour + Protection IV + Resistance II mitigate first, then x0.6; PvP / self / void / `/kill`
-  unchanged by default and changeable by config; per-type override; environmental gate; i-frames identical
-  to vanilla; lethal damage still kills; multiplier 0 never heals.
-* Hunger: x0.5 / x1 / x1 / x1.25 on `causeFoodExhaustion`; 1000 tiny steps accumulate exactly half; jump and
-  natural-regeneration exhaustion halved while regeneration speed is identical; mode switching leaves food,
-  saturation and exhaustion untouched.
-* Ranged (600 shots per sample; same shooter, same geometry, only the target differs): spread against an Easy
-  player is ~14/vanilla times wider (within +-25 % of expectation), a Normal player is shot at exactly like a
-  non-player target (within 12 %), projectile speed and mean arrow damage unchanged, switching target back and
-  forth is honoured. Covered: skeleton, stray, illusioner, drowned (trident), pillager (crossbow). Disabling a
-  family in config restores vanilla aim; a Hard player's aim is vanilla.
-* Commands: a player can set only their own mode without permission; there is no syntax to target another
-  player; non-ops cannot use `admin`; ops can inspect/reset; level-0 rejected; unknown player not reported as
-  reset; console can inspect but not choose; subcommand visibility is right for players vs ops (the client's
-  tab-complete tree); vanilla `/difficulty` still exists; `admin reload` applies immediately, reports NaN as a
-  warning, and keeps the previous config when the file is unreadable; world difficulty unchanged.
-* Lifecycle: mode survives death and `PlayerList.respawn`, and is written to the world's `players.json`.
+Selected measured evidence (Normal-difficulty test world unless stated):
 
-Negative controls inside the suite (so a pass cannot be vacuous): the ranged test fails if the world
-difficulty would make Easy indistinguishable from vanilla; "family disabled" must equal baseline while
-"family enabled" must be >1.5x wider.
+* **Damage, exactly once, in every world difficulty:** in Easy, Normal and Hard worlds a Hard player loses exactly 1.25x, an
+  Easy player 0.6x and an Elite player the formula value of *that world's* vanilla result (Hard world: Normal 9.0, Hard 11.25).
+* **Elite vs armour** (zombie hit, raw 3.0): see `docs/DESIGN.md`; netherite + Protection IV: Normal 0.242, Hard 0.302,
+  **Elite 1.154** (4.8x vanilla, 17 hits to die). Every tier matched an independent computation from vanilla `CombatRules`
+  within 0.2 %, and better armour strictly reduces Elite damage at each tier. Resistance II, Resistance V (immune), absorption
+  hearts, shield blocking, invulnerability frames and the PvP/self/void/`/kill` exceptions behave as specified.
+* **Elite hunger:** jump, sprint-jump, melee hit, block break and damage taken each cost exactly 2.0x (Hard 1.25x);
+  100 sprint-jumps from 20 food / 0 saturation lose Normal 5, Hard 6, Elite 10 food points.
+* **Aim** (800 shots per sample; spread = RMS direction deviation): Normal 0.059-0.062 (uncertainty 6), Easy 0.13-0.14,
+  **Elite 0.0096-0.0100** for skeleton, stray, illusioner, drowned, pillager and piglin, witch (uncertainty 8: Normal 0.078,
+  Elite 0.0099). A Normal player is shot exactly like a non-player target; projectile speed and mean arrow damage unchanged;
+  switching target on the same shooter follows immediately; config toggles restore vanilla. In a Hard world: Elite 0.0099 vs
+  vanilla 0.0197.
+* **Elite is not a guaranteed hit:** spread-only hit fraction on a standing player: Elite 100 % at 12 blocks, 93 % at 24,
+  77 % at 32; vanilla (Normal world) 13 % at 24, 8 % at 32. (In a Hard world vanilla is already tight, so the gain there is 2x.)
+* **Peaceful damage:** all 51 registered damage types: 49 fully blocked, exactly `out_of_world` and `generic_kill` bypass.
+* **Peaceful real hazards over real ticks:** lava, burning, cactus, magma block, sweet berry bush, suffocation, drowning,
+  powder snow and falling each hurt a Normal control (10.5, 1.0, 1.5, 2.7, 1.5, 1.5, 2.0, 3.2, 3.2 HP) and never the Peaceful
+  player.
+* **Peaceful PvP:** all 20 ordered pairs of real melee attacks: any pair involving Peaceful dealt 0.00, every other pair 1.00.
+  Real arrows, TNT, tamed wolves, thrown/indirect-magic/explosion damage sources follow the responsible player.
+* **Peaceful vs mobs:** a real zombie spent up to 175 ticks within 2 blocks of a Peaceful player without ever targeting or
+  hurting it; stayed hostile to a Normal player beside the Peaceful one; dropped its target within 3 ticks of a mid-fight
+  switch and resumed on switching back; a live skeleton never targeted it nor shot near it (control shoots a Normal player).
+* **Hunger, effects, lifecycle:** no exhaustion or food loss from heavy activity; banked exhaustion capped, not converted;
+  starving player takes no damage while Peaceful and again after leaving; harmful effects refused and cleared on entry,
+  beneficial kept; wither/poison/hunger-inflicting mob attacks inflict nothing; all 25 mode transitions take effect on the next
+  hit with no attribute/ability/game-rule/world-difficulty change; `/kill`, void and `/damage ... generic_kill` still work;
+  mode survives death, respawn and a disconnect/reconnect with the same UUID.
+* **Restrictions/commands:** every mode selectable; disable blocks selection with a clear error and leaves the saved choice
+  untouched; re-enable is live; a disabled mode a player already uses keeps being applied; suggestions never offer disabled
+  modes (players and ops); permission matrix: console, command block and op (levels 2 and 3 tested) allowed, level 0/1 and
+  no-permission sources denied for all seven admin subcommands, `/execute` needs level 2 itself and keeps the caller's
+  permission; last-difficulty refusal and `enable all` recovery; file edit + reload applied live; broken/all-disabled
+  edits rejected with the previous policy kept.
 
-## 5. Dedicated server smoke test (`./gradlew runServer`, local, offline-mode, loopback, disposable `run/`)
+### 3.4 Mutation check: **PASS**
+With the Peaceful hooks (`allowDamage`, `blocksTargeting`, `blocksEffect`) temporarily neutralised, **17 tests failed**
+(including all four live-AI tests, the real-hazard, PvP, TNT, wolf, effect, hunger and lifecycle tests). Source restored
+byte-for-byte. This shows those tests are sensitive to the feature, not vacuous.
 
-World difficulty `hard`; seeded `players.json` with Alice=EASY, Bob=NORMAL; driven via the server console.
+### 3.5 Standalone dedicated-server test of the **built JAR**: **PASS** (run on the pre-final JAR, then repeated on the final JAR with identical results)
+`personal-difficulty-1.1.0.jar` (+ Fabric API 0.165.0+26.3) in `mods/` of a genuine Fabric server (Fabric server launcher,
+Loader 0.20.1, Minecraft 26.3, Java 25), local loopback, offline mode, disposable world on **Hard**, driven from the console:
 
-* All items in this section were re-run against the final jar above.
-* **PASS** server starts with the mod; log line `Personal Difficulty ready: 2 explicit player selection(s)`;
-  all 7 mixins applied (a failure would abort startup).
-* **PASS** `/personaldifficulty`, `status`, `admin config|status|reset|reload` execute; `bogus` rejected;
-  console `easy` refused with an explanation.
-* **PASS** `/difficulty` reports **Hard** before and after (world difficulty unchanged).
-* **PASS** after `admin reset Alice` + `stop`, `players.json` contained only Bob=NORMAL.
-* **PASS** restart on the same world: `1 explicit player selection(s) loaded`; Bob=NORMAL, Alice=INHERIT.
-* **PASS** no mod-related errors, warnings or exceptions in either server log.
+* mod `personaldifficulty 1.1.0` listed, all 13 mixins applied, no mod errors/exceptions in any log;
+* a seeded **1.0.0-format** `players.json` (INHERIT, NORMAL, EASY, HARD and an unknown `NIGHTMARE` entry) loaded:
+  Alice(INHERIT)->NORMAL, Bob->NORMAL, Carol->EASY, Dave->HARD, the unknown entry kept with a warning, and the file was
+  **byte-identical** after the session (no needless rewrite);
+* `admin difficulties/disable/enable/reload/status/reset/config` work from the console; disabling the last enabled difficulty
+  is refused; `enable all` recovers; console `easy` and `inherit` are refused with clear messages; `/difficulty` reported
+  **Hard** before and after (never changed);
+* restart: the availability policy survived, and the first rewrite kept Dave=HARD and the `NIGHTMARE` entry while dropping
+  only the retired values and the reset player;
+* corrupt data: a malformed availability file -> all enabled + warning + `*.backup-*`; a truncated `players.json` -> empty
+  state + warning + `*.backup-*` (original recoverable); invalid config values defaulted/clamped with warnings; server started
+  normally.
 
-## 6. NOT RUN (honest gaps)
+### 3.6 Built JAR inspection: **PASS**
+`build/libs/personal-difficulty-1.1.0.jar`, 73,129 bytes, sha256
+`f27a2bae6aa1d0a178bd4c9960120f89c7383a68d688ebff80ccdde5614305c1`. 37 classes (13 mixins), `fabric.mod.json`
+(`environment: server`, `minecraft ~26.3`, `fabricloader >=0.20.1`, `java >=25`, `fabric-api *`), mixin config
+(`defaultRequire: 1`), default config template, MIT licence. No `net.minecraft.client` references, no gametest classes,
+no bundled Loader/Fabric API/Gson. The mod source contains no call that sets the world difficulty.
 
-* **NOT RUN: a real Minecraft client connecting.** No client is available here. Therefore *not directly
-  verified*: that a vanilla/unmodded client joins, that `/personaldifficulty` tab-completion renders in a real
-  client, or that selections survive a *real* client reconnect. Reasoning only (not a test): the mod registers
-  nothing synced to clients and sends no custom packets; reconnect safety follows from selections being keyed
-  by UUID and independent of the entity (death/respawn is tested).
-* **NOT RUN: a single end-to-end "player picks mode -> restart -> still set" flow.** The two halves were
-  verified separately (command writes `players.json` in the gametest; the dedicated server reads that format
-  after a restart).
-* **NOT RUN:** live-AI scenarios (a skeleton's own goal selecting/changing targets); the tests call
-  `performRangedAttack` on real mobs directly. Bogged / parched / wither skeleton and piglins untested.
-* **NOT RUN:** dimension changes, real armour-durability/shield-blocking interplay, other mods.
-* **NOT RUN:** upload/publish to Modrinth, GitHub release, push (not authorised).
+## 4. Corrections to earlier claims (1.0.0 documentation)
 
-## 7. NOT IMPLEMENTED
+1. The 1.0.0 test described as "diamond armour + Protection IV + Resistance II mitigate first, then x0.6" did not apply armour
+   *points*: armour attributes are only applied on the player's next tick and that test never ticked, so only Protection and
+   Resistance were in effect. The 1.0.0 mod was unaffected (the hook point is correct), but the armour part of that claim was
+   unproven until now. Armour points are now asserted to be in effect in every armour test.
+2. The 1.0.0 "dedicated server smoke test against the final JAR" used Gradle's dev launcher (`runServer`), which runs the project's
+   compiled classes, not the packaged JAR. The 1.1.0 smoke test above uses the packaged JAR on a standalone Fabric server.
+3. The 1.0.0 "Easy/Hard damage-scaling exactly once" evidence was gathered in a Normal-difficulty test world, where vanilla's own
+   scaling is x1. 1.1.0 verifies it in Easy, Normal and Hard worlds.
 
-* Hard-mode ranged accuracy adjustment (optional in the brief).
-* Aim adjustment for piglins (brain-driven, no target passed to the shot), witches, withers, ghasts, blazes,
-  snow golems, llamas and modded shooters.
+## 5. NOT RUN
 
-## 8. Environment note
+* **A real Minecraft client connecting.** No client is available here. Not verified: that an unmodified client joins and plays;
+  how the command suggestions render and whether the live "ask server" suggestion round-trip behaves in a real client;
+  hurt animation/sound for cancelled Peaceful damage; behaviour over a real reconnect (simulated here by removing and re-adding a
+  server-side player with the same UUID).
+* **Live AI for mobs other than zombies and skeletons.** For 36 other vanilla mob types (including piglins, hoglins, the Warden,
+  the Ender Dragon, creepers, spiders, phantoms, witches, pillagers) only `canAttack`/`setTarget` were checked directly on
+  un-ticked mobs. That proves the gate is wired; it is not evidence of their live behaviour. Aim for piglins, witches, pillagers
+  etc. was verified by invoking their ranged attack directly, not by letting their AI choose and fire.
+* Bogged, parched and wither skeleton aim (same inherited method as the tested skeleton/stray); Hard-world Peaceful tests;
+  dimension changes; explosion knockback on Peaceful players; interaction with other mods, totems, elytra, vehicles, lightning,
+  end crystals and other attribution chains not listed in section 3.3.
+* Play-testing of Elite balance. The defaults are a computed, measured design estimate, not tuned by play.
+* Publishing: no push, pull request, release or Modrinth upload was made.
 
-Maven Central returned intermittent 429/404 responses in this sandbox; a local caching mirror with retries
-(outside the repository, never part of the build files) was used for dependency resolution. Nothing in the
-project depends on it.
+## 6. NOT IMPLEMENTED
+
+* Hard-mode ranged accuracy change. Aim adjustment for wither, ghast, blaze, breeze, snow golem, llama and modded shooters.
+
+## 7. Method notes
+
+* The GameTest server defaults new players to creative and does not tick mock players: the tests set survival, make the server
+  simulate movement (`isClientAuthoritative() = false`), and advance a player with `tick()` + `doTick()`; armour needs one such
+  tick to take effect. Each of these initially produced a vacuous or failing test that was found by reading the failure, not
+  assumed.
+* Suffocation: vanilla puts a player whose head cell fills into the crawling pose, so the test forces the standing pose each tick
+  to reach the real `in_wall` code path (models the first tick after a block lands on a standing player).
+* AI tests share one world with neighbouring arenas, so they assert on *this* mob's target and *its own* arrows only.
+* Maven Central returned intermittent 429/404 responses in this sandbox; a local caching mirror with retries (outside the
+  repository) was used to resolve dependencies. Nothing in the project depends on it.
+
+## 8. Remaining risks before practical use
+
+1. Everything was exercised on a server side only; real-client behaviour is unverified (section 5).
+2. Elite's difficulty is a design estimate; expect to tune `elite.*` after play.
+3. Peaceful attribution is best-effort (README "Limitations"): unattributable harm to *non-Peaceful* victims is not blocked.
+4. Peaceful forbids harmful effects from any source, including `/effect` by operators.
+5. A corrupt `players.json` leaves players on Normal until an operator restores the `*.backup-*` copy.
+
+## 9. Checklist for your own real-client test (Modrinth-managed Fabric 26.3 server)
+
+1. Install Fabric API 0.165.0+26.3 and `personal-difficulty-1.1.0.jar`; start; confirm the log line `Personal Difficulty ready: ...`.
+2. Join with an **unmodified** client. `/personaldifficulty status` should say NORMAL; type `/personaldifficulty ` and check the
+   suggestions list `normal easy hard elite peaceful` (and `status`; `admin` only for ops).
+3. With two accounts: set one to `peaceful`, the other to `elite`; confirm neither can hurt the other, mobs ignore the Peaceful
+   player but attack the Elite one, and that the Peaceful player loses no hunger.
+4. As an op: `/personaldifficulty admin disable elite`; the Elite player keeps playing on Elite; after they switch to normal they
+   get a clear error trying to return; `/personaldifficulty admin enable all` restores it without a restart.
+5. Restart the server and confirm choices and the availability policy persisted; `/difficulty` must still show your world difficulty.
+6. Upgrading a 1.0.0 world: keep `world/personaldifficulty/players.json`; former `inherit` players appear as Normal.

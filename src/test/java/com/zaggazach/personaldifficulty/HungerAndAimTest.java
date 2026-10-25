@@ -16,7 +16,8 @@ class HungerAndAimTest {
 	void hungerMultipliersPerMode() {
 		assertEquals(0.05F, HungerAdjuster.adjustExhaustion(cfg, PersonalDifficultyMode.EASY, 0.1F), 1e-6);
 		assertEquals(0.1F, HungerAdjuster.adjustExhaustion(cfg, PersonalDifficultyMode.NORMAL, 0.1F));
-		assertEquals(0.1F, HungerAdjuster.adjustExhaustion(cfg, PersonalDifficultyMode.INHERIT, 0.1F));
+		assertEquals(0.2F, HungerAdjuster.adjustExhaustion(cfg, PersonalDifficultyMode.ELITE, 0.1F), 1e-6);
+		assertEquals(0.0F, HungerAdjuster.adjustExhaustion(cfg, PersonalDifficultyMode.PEACEFUL, 0.1F), "Peaceful accrues no exhaustion");
 		assertEquals(0.125F, HungerAdjuster.adjustExhaustion(cfg, PersonalDifficultyMode.HARD, 0.1F), 1e-6);
 	}
 
@@ -37,7 +38,8 @@ class HungerAndAimTest {
 		// Model of FoodData: every 4.0 exhaustion costs 1 food point once saturation is empty.
 		assertTrue(foodLost(PersonalDifficultyMode.EASY, 400) < foodLost(PersonalDifficultyMode.NORMAL, 400));
 		assertTrue(foodLost(PersonalDifficultyMode.HARD, 400) > foodLost(PersonalDifficultyMode.NORMAL, 400));
-		assertEquals(foodLost(PersonalDifficultyMode.NORMAL, 400), foodLost(PersonalDifficultyMode.INHERIT, 400));
+		assertTrue(foodLost(PersonalDifficultyMode.ELITE, 400) > foodLost(PersonalDifficultyMode.HARD, 400), "Elite is hungrier than Hard");
+		assertEquals(0, foodLost(PersonalDifficultyMode.PEACEFUL, 400), "Peaceful never loses food");
 		// Vanilla compares "exhaustion > 4.0" strictly, so exact multiples land one point lower.
 		assertEquals(49, foodLost(PersonalDifficultyMode.EASY, 400));
 		assertEquals(99, foodLost(PersonalDifficultyMode.NORMAL, 400));
@@ -83,7 +85,7 @@ class HungerAndAimTest {
 
 	@Test
 	void otherTargetsKeepVanillaAccuracy() {
-		for (PersonalDifficultyMode m : new PersonalDifficultyMode[] {PersonalDifficultyMode.NORMAL, PersonalDifficultyMode.INHERIT, PersonalDifficultyMode.HARD}) {
+		for (PersonalDifficultyMode m : new PersonalDifficultyMode[] {PersonalDifficultyMode.NORMAL, PersonalDifficultyMode.PEACEFUL, PersonalDifficultyMode.HARD}) {
 			assertEquals(2.0F, RangedAccuracy.adjust(cfg, Family.SKELETON, m, 2.0F), m.name());
 		}
 		assertEquals(2.0F, RangedAccuracy.adjust(cfg, Family.SKELETON, null, 2.0F), "non-player target (null mode)");
@@ -107,5 +109,38 @@ class HungerAndAimTest {
 		assertEquals(2.0F, RangedAccuracy.adjust(c, Family.DROWNED, PersonalDifficultyMode.EASY, 2.0F));
 		assertEquals(14.0F, RangedAccuracy.adjust(c, Family.ILLUSIONER, PersonalDifficultyMode.EASY, 2.0F));
 		assertEquals(14.0F, RangedAccuracy.adjust(c, Family.CROSSBOW, PersonalDifficultyMode.EASY, 2.0F));
+	}
+
+	@Test
+	void eliteTightensSpreadAndNeverWidens() {
+		assertEquals(1.0F, RangedAccuracy.adjust(cfg, Family.SKELETON, PersonalDifficultyMode.ELITE, 6.0F));
+		assertEquals(1.0F, RangedAccuracy.adjust(cfg, Family.SKELETON, PersonalDifficultyMode.ELITE, 2.0F));
+		assertEquals(0.2F, RangedAccuracy.adjust(cfg, Family.SKELETON, PersonalDifficultyMode.ELITE, 0.2F), "never looser than vanilla");
+		assertTrue(RangedAccuracy.adjust(cfg, Family.SKELETON, PersonalDifficultyMode.ELITE, 2.0F) > 0.0F, "not a guaranteed-zero-spread shot by default");
+	}
+
+	@Test
+	void eliteAimAppliesToAllSupportedFamiliesAndCanBeDisabledPerFamily() {
+		for (Family f : Family.values()) {
+			assertEquals(1.0F, RangedAccuracy.adjust(cfg, f, PersonalDifficultyMode.ELITE, 6.0F), f.name());
+		}
+		PdConfig c = PdConfigLoader.parse("ranged.piglins=false\nranged.witches=false").config();
+		assertEquals(6.0F, RangedAccuracy.adjust(c, Family.PIGLIN, PersonalDifficultyMode.ELITE, 6.0F));
+		assertEquals(6.0F, RangedAccuracy.adjust(c, Family.WITCH, PersonalDifficultyMode.EASY, 6.0F) > 6.0F ? 0F : 6.0F);
+		assertEquals(1.0F, RangedAccuracy.adjust(c, Family.SKELETON, PersonalDifficultyMode.ELITE, 6.0F));
+	}
+
+	@Test
+	void peacefulAndHardAndNormalTargetsKeepVanillaAim() {
+		for (PersonalDifficultyMode m : new PersonalDifficultyMode[] {PersonalDifficultyMode.PEACEFUL, PersonalDifficultyMode.HARD, PersonalDifficultyMode.NORMAL}) {
+			assertEquals(6.0F, RangedAccuracy.adjust(cfg, Family.SKELETON, m, 6.0F), m.name());
+		}
+	}
+
+	@Test
+	void eliteHungerIsTwiceNormalAndWorseThanHard() {
+		float one = HungerAdjuster.adjustExhaustion(cfg, PersonalDifficultyMode.NORMAL, 1.0F);
+		assertEquals(2.0F * one, HungerAdjuster.adjustExhaustion(cfg, PersonalDifficultyMode.ELITE, 1.0F));
+		assertTrue(foodLost(PersonalDifficultyMode.ELITE, 400) > foodLost(PersonalDifficultyMode.HARD, 400));
 	}
 }

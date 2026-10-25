@@ -6,10 +6,16 @@
 		"AbstractSkeletonAimMixin",
 		"CrossbowAimMixin",
 		"DrownedAimMixin",
+		"EnderDragonTargetMixin",
 		"FoodDataMixin",
 		"IllusionerAimMixin",
 		"LivingEntityDamageMixin",
-		"PlayerExhaustionMixin"
+		"LivingEntityPeacefulMixin",
+		"MobTargetMixin",
+		"PiglinAimMixin",
+		"PlayerExhaustionMixin",
+		"WardenTargetMixin",
+		"WitchAimMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

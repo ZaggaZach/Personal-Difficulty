@@ -11,15 +11,21 @@ import org.junit.jupiter.api.io.TempDir;
 
 class ModeAndConfigTest {
 	@Test
-	void allModesParseAndInheritDiffersFromNormal() {
+	void allModesParseAndInheritIsGone() {
 		assertEquals(PersonalDifficultyMode.EASY, PersonalDifficultyMode.parse("easy").orElseThrow());
 		assertEquals(PersonalDifficultyMode.HARD, PersonalDifficultyMode.parse(" HARD ").orElseThrow());
 		assertEquals(PersonalDifficultyMode.NORMAL, PersonalDifficultyMode.parse("Normal").orElseThrow());
-		assertEquals(PersonalDifficultyMode.INHERIT, PersonalDifficultyMode.parse("inherit").orElseThrow());
+		assertEquals(PersonalDifficultyMode.ELITE, PersonalDifficultyMode.parse("Elite").orElseThrow());
+		assertEquals(PersonalDifficultyMode.PEACEFUL, PersonalDifficultyMode.parse("peaceful").orElseThrow());
+		assertTrue(PersonalDifficultyMode.parse("inherit").isEmpty(), "inherit is no longer a selectable mode");
+		assertEquals(PersonalDifficultyMode.NORMAL, PersonalDifficultyMode.parseStored("INHERIT").orElseThrow(), "legacy stored value maps to NORMAL");
+		assertEquals(PersonalDifficultyMode.NORMAL, PersonalDifficultyMode.DEFAULT);
+		assertEquals(5, PersonalDifficultyMode.values().length);
 		assertTrue(PersonalDifficultyMode.parse("nightmare").isEmpty());
 		assertTrue(PersonalDifficultyMode.parse(null).isEmpty());
-		assertNotEquals(PersonalDifficultyMode.INHERIT, PersonalDifficultyMode.NORMAL);
-		assertFalse(PersonalDifficultyMode.INHERIT.hasProfile());
+		assertTrue(java.util.Arrays.stream(PersonalDifficultyMode.values()).noneMatch(m -> m.name().equals("INHERIT")));
+		assertTrue(PersonalDifficultyMode.ELITE.hasProfile());
+		assertFalse(PersonalDifficultyMode.PEACEFUL.hasProfile());
 		assertFalse(PersonalDifficultyMode.NORMAL.hasProfile());
 		assertTrue(PersonalDifficultyMode.EASY.hasProfile());
 		assertTrue(PersonalDifficultyMode.HARD.hasProfile());
@@ -37,6 +43,12 @@ class ModeAndConfigTest {
 		assertFalse(c.voidApplyProfile());
 		assertFalse(c.adminApplyProfile());
 		assertTrue(c.easyRangedMinUncertainty() > 10.0, "must be wider than vanilla Easy world spread");
+		assertEquals(2.0, c.elite().damageMultiplier());
+		assertEquals(2.0, c.elite().hungerMultiplier());
+		assertEquals(0.60, c.eliteArmorEffectiveness());
+		assertTrue(c.eliteRangedMaxUncertainty() < 2.0, "tighter than vanilla Hard world spread");
+		assertTrue(c.elite().damageMultiplier() > c.hard().damageMultiplier());
+		assertTrue(c.elite().hungerMultiplier() > c.hard().hungerMultiplier());
 	}
 
 	@Test
@@ -114,5 +126,24 @@ class ModeAndConfigTest {
 	void unreadableFileReportsReadFailed(@TempDir Path dir) {
 		PdConfigLoader.Result r = PdConfigLoader.load(dir.resolve("does-not-exist.properties"));
 		assertTrue(r.readFailed());
+	}
+
+	@Test
+	void eliteSettingsAreValidatedLikeTheOthers() {
+		PdConfigLoader.Result r = PdConfigLoader.parse(String.join("\n",
+			"elite.damage-multiplier=NaN",
+			"elite.hunger-multiplier=-4",
+			"elite.armor-effectiveness=7",
+			"elite.ranged-max-uncertainty=Infinity"));
+		PdConfig c = r.config();
+		assertEquals(2.0, c.elite().damageMultiplier(), "NaN -> default");
+		assertEquals(0.0, c.elite().hungerMultiplier(), "negative clamped to 0");
+		assertEquals(1.0, c.eliteArmorEffectiveness(), "armour effectiveness clamped to [0,1]");
+		assertEquals(1.0, c.eliteRangedMaxUncertainty(), "infinity -> default");
+		assertEquals(4, r.warnings().size(), r.warnings().toString());
+		PdConfig custom = PdConfigLoader.parse("elite.damage-multiplier=3.5\nelite.armor-effectiveness=0.4\nelite.damage-type.minecraft.fall=1.5").config();
+		assertEquals(3.5, custom.elite().damageMultiplier());
+		assertEquals(0.4, custom.eliteArmorEffectiveness());
+		assertEquals(1.5, custom.elite().damageTypeOverrides().get("minecraft:fall"));
 	}
 }
