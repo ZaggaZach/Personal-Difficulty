@@ -1,0 +1,15 @@
+{
+	"schemaVersion": 1,
+	"id": "personaldifficulty-e2e-fixture",
+	"version": "0",
+	"name": "Personal Difficulty e2e fixture",
+	"description": "Test-only mod used by the end-to-end tests: opens a test menu built on the Personal Difficulty UI base classes. Never shipped.",
+	"environment": "server",
+	"entrypoints": {
+		"main": ["com.zaggazach.personaldifficulty.e2e.fixture.FixtureMod"]
+	},
+	"depends": {
+		"personaldifficulty": "*",
+		"fabric-api": "*"
+	}
+}

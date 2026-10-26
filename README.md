@@ -347,6 +347,7 @@ The `players.json` format did not change, so there is **no rewrite on upgrade**:
 ```
 ./gradlew build            # compiles and runs the 94 unit tests -> build/libs/personal-difficulty-<version>.jar
 ./gradlew runGameTest      # 116 in-server integration tests (115 of ours + the framework's always_pass) (real ServerPlayer / mobs / mixins)
+./gradlew e2eTest          # real dedicated server + headless client smoke test (downloads once, see docs/E2E.md)
 ./gradlew runServer        # local dev server in run/ (accept the EULA in run/eula.txt first)
 ```
 

@@ -15,7 +15,8 @@
 			"com.zaggazach.personaldifficulty.gametest.EliteRegenGameTests",
 			"com.zaggazach.personaldifficulty.gametest.EliteAiGameTests",
 			"com.zaggazach.personaldifficulty.gametest.EliteHuntGameTests",
-			"com.zaggazach.personaldifficulty.gametest.EliteEffectsGameTests"
+			"com.zaggazach.personaldifficulty.gametest.EliteEffectsGameTests",
+			"com.zaggazach.personaldifficulty.gametest.Phase0PermissionProbeGameTests"
 		]
 	},
 	"depends": {

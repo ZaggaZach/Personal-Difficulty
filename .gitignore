@@ -41,3 +41,6 @@ replay_*.log
 
 # local disposable dedicated-server test dir
 run/
+
+# Minecraft bootstrap in unit tests writes logs/ into the project directory
+/logs/

@@ -53,10 +53,59 @@ dependencies {
 }
 
 test {
-	useJUnitPlatform()
+	// the end-to-end tests (tag "e2e") need a downloaded server and are run only by ./gradlew e2eTest
+	useJUnitPlatform {
+		excludeTags "e2e"
+	}
 	testLogging {
 		events "passed", "failed", "skipped"
 		exceptionFormat "full"
+	}
+}
+
+// Test-only fixture mod for the end-to-end tests (opens a test menu built on the ui base classes). Built from the test
+// classes in ...e2e.fixture plus src/e2e-fixture/fabric.mod.json; never part of the shipped jar.
+tasks.register("e2eFixtureJar", Jar) {
+	group = "verification"
+	description = "Builds the test-only fixture mod used by e2eTest."
+	dependsOn "testClasses"
+	archiveBaseName = "personaldifficulty-e2e-fixture"
+	archiveVersion = "0"
+	destinationDirectory = layout.buildDirectory.dir("e2e/libs")
+	from(sourceSets.test.output.classesDirs) {
+		include "com/zaggazach/personaldifficulty/e2e/fixture/**"
+	}
+	from("src/e2e-fixture") {
+		include "fabric.mod.json"
+	}
+}
+
+// End-to-end tests: a REAL dedicated server process runs the built jar and a headless protocol client connects to it.
+// NOT part of `build`/`check`. First use downloads the Fabric installer, the Minecraft server and Fabric API into
+// build/e2e/cache (network access to maven.fabricmc.net and Mojang's download servers needed once; later runs are offline
+// if the cache is kept).
+tasks.register("e2eTest", Test) {
+	group = "verification"
+	description = "Runs the end-to-end tests against a real dedicated server process (downloads on first use)."
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform {
+		includeTags "e2e"
+	}
+	dependsOn jar, tasks.named("e2eFixtureJar")
+	systemProperty "pd.jar", jar.archiveFile.get().asFile.absolutePath
+	systemProperty "pd.fixture.jar", tasks.named("e2eFixtureJar").get().archiveFile.get().asFile.absolutePath
+	systemProperty "pd.e2e.minecraft", project.minecraft_version
+	systemProperty "pd.e2e.loader", project.loader_version
+	systemProperty "pd.e2e.fabricApi", project.fabric_api_version
+	systemProperty "pd.e2e.cache", System.getProperty("pdE2eCache", layout.buildDirectory.dir("e2e/cache").get().asFile.absolutePath)
+	systemProperty "pd.e2e.work", layout.buildDirectory.dir("e2e/work").get().asFile.absolutePath
+	systemProperty "pd.e2e.debug", System.getProperty("e2eDebug", "false")
+	systemProperty "pd.e2e.serverDebug", System.getProperty("e2eServerDebug", "false")
+	testLogging {
+		events "passed", "failed", "skipped"
+		exceptionFormat "full"
+		showStandardStreams = false
 	}
 }
 
