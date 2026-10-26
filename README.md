@@ -62,8 +62,11 @@ error and changes nothing. Choosing the one you already have says "nothing chang
 | `/personaldifficulty admin restrict <player> <d1>[,<d2>...] [switch\|keep]` | Limit the player to an allow-list of difficulties (see below) |
 | `/personaldifficulty admin unrestrict <player>` | Remove the player's allow-list (a lock is left alone) |
 | `/personaldifficulty admin reset <player>` | Mode **Normal**, lock cleared **and** allow-list cleared. On a player whose stored record is invalid it is the explicit repair (verified backup first) |
-| `/personaldifficulty admin config` | Show the effective server configuration |
-| `/personaldifficulty admin reload` | Re-read the config file **and** the availability file; applies immediately. Also re-reads `players.json` if (and only if) it is currently refused as corrupt, unsupported or changed behind the mod's back |
+| `/personaldifficulty admin config [prefix]` | The server overview, then every effective setting with its **source** (default, properties, override); `config elite.` shows only keys starting with `elite.` |
+| `/personaldifficulty admin get <key>` | One setting: value and source, the value without the override, default, allowed range and when a change applies |
+| `/personaldifficulty admin set <key> <value>` | Change a setting at runtime without editing files (strictly validated; stored as an override) |
+| `/personaldifficulty admin unset <key>` | Remove the override of a setting; it falls back to the properties file or the default |
+| `/personaldifficulty admin reload` | Re-read the properties file, the **overrides file** and the availability file; applies immediately. Also re-reads `players.json` if (and only if) it is currently refused as corrupt, unsupported or changed behind the mod's back |
 
 Permission is enforced by the command parser (not just hidden), so it holds for players, command blocks,
 `/execute` chains and the console. A command block or the console cannot *choose* a difficulty (they are not
@@ -316,11 +319,61 @@ elite.effects.drowned-chill-seconds=3
 
 Peaceful deliberately has no settings.
 
+### Changing settings with commands: the overrides layer (1.4.0)
+
+Every setting above can also be read and changed with `admin get`, `admin set` and `admin unset` (permission level 2, console allowed),
+with tab-completion for keys and values. There are three layers, lowest to highest:
+
+1. **built-in defaults**;
+2. **`config/personaldifficulty.properties`**, hand-edited; the mod only creates it from the default template when it is missing, and never changes an existing one;
+3. **`config/personaldifficulty-overrides.json`**, written **only** by `admin set`/`unset`: `{"version":1,"values":{"elite.damage-multiplier":2.5}}`.
+
+An override beats the properties file; `admin config` and `admin get` always say where a value comes from. Note that the
+generated default properties file lists every key, so until you delete a line from it its values show `properties`, not `default`.
+
+* **`set` is strict.** A value must be exactly right for the setting (a finite number inside its range, a whole number for
+  whole-number settings, `true`/`false`); otherwise it is refused with the allowed range, and nothing changes. (The hand-edited properties file
+  keeps its old lenient rules: bad values fall back to the default, out-of-range values are clamped, every problem is logged.)
+* **A value equal to the one below the override layer is never stored.** If you `set` a setting to the value it already has from the
+  properties file (or the default), any existing override of that setting is **removed** and nothing is stored: the setting then follows
+  the properties file, so later edits of that file apply. An override cannot be used to "pin" a value against future properties edits.
+  (If the properties file later changes to equal an existing override, the override stays and is still reported as an override until you
+  `unset` it.)
+* **Damage-type multipliers** (`<mode>.damage-type.<namespace>.<path>`, for example `easy.damage-type.minecraft.fall`) work with
+  `get`/`set`/`unset` too. `<mode>` must be `easy`, `hard` or `elite`; the damage type must exist on the server (otherwise `set` is refused with
+  close matches); namespace and path may contain lower-case letters, digits, `_` and `-` (paths also `.`). The first dot after
+  `damage-type.` separates namespace from path. **Damage types whose path contains `/` cannot be typed in a command and must be configured in the
+  properties file.**
+* **Applies at once.** A change takes effect immediately for everyone (no restart); `elite.priority.*` settings are picked up at each mob's
+  next scan. `get` shows the timing.
+
+**Safety of the overrides file** (the same principles as `players.json`):
+
+* Every rewrite is atomic (temporary file, flushed, renamed) and preceded by a **byte-verified** copy of the previous file,
+  `personaldifficulty-overrides.json.backup-<millis>`. **Only the five newest ordinary backups are kept.** A failed write changes nothing:
+  the file and the running configuration stay exactly as they were.
+* **A corrupt, unsupported or unreadable file is never overwritten**, and it never stops the server: the overrides are simply not applied
+  (settings are then those of the properties file and the defaults, which is **not** what was configured with `set`). This is reported loudly: an `ERROR`
+  line at startup, a warning in `admin config`, and every `set`/`unset` is refused with the reason. The file is judged in this order: not valid JSON, not an object, no
+  `version`, **duplicate JSON keys** (ambiguous), or no `values` object = corrupt; a `version` that is not a whole number of at least 1 or is above 1 =
+  unsupported (the version is judged before the structure). A verified **evidence copy**,
+  `personaldifficulty-overrides.json.evidence-<millis>`, is kept (an identical earlier copy is reused). **Evidence copies are never deleted by the
+  five-backup pruning or by the mod at all; delete them by hand when you no longer need them.**
+* **Recovery:** fix or replace the file (or copy a `.backup-`/`.evidence-` file back by hand), then run `admin reload`. Reload **always re-reads the
+  overrides file**: a usable file is adopted; an unusable one leaves the last good overrides in force and keeps changes refused.
+* **Edited while the server runs?** The mod notices a change it did not make just before its next write, refuses that write, keeps an evidence copy and
+  waits for `admin reload`, which loads your edit on purpose. The properties file is hand-edited by design and is not guarded this way; `reload` reads it.
+* **Nothing is silently deleted.** Unknown keys, entries with invalid values, damage types that do not exist on the server and unknown top-level
+  fields are kept verbatim every time the file is rewritten, ignored (with a warning, once per load or reload) and shown in `admin config`. Only an
+  explicit `set` or `unset` of that very key replaces or removes its entry (the previous file is then in a verified backup).
+* Downgrading to 1.3.0 or earlier simply ignores the overrides file (those versions know nothing about it): the settings fall back to the properties file.
+
 ## Persistence
 
 | What | Where |
 |---|---|
-| Server config | `<server>/config/personaldifficulty.properties` |
+| Server config (hand-edited) | `<server>/config/personaldifficulty.properties` |
+| Setting overrides (written by `admin set`/`unset`) | `<server>/config/personaldifficulty-overrides.json` |
 | Availability policy | `<server>/config/personaldifficulty-availability.json` |
 | Player choices (UUID-keyed) | `<world>/personaldifficulty/players.json` |
 

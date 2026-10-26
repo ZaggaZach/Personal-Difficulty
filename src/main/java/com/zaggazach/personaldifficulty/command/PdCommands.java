@@ -10,7 +10,16 @@ import com.zaggazach.personaldifficulty.PdHooks;
 import com.zaggazach.personaldifficulty.PdPermissions;
 import com.zaggazach.personaldifficulty.PdRuntime;
 import com.zaggazach.personaldifficulty.PersonalDifficultyMode;
+import com.zaggazach.personaldifficulty.config.ConfigReport;
+import com.zaggazach.personaldifficulty.config.ConfigState;
+import com.zaggazach.personaldifficulty.config.FamilyDef;
+import com.zaggazach.personaldifficulty.config.FamilyKey;
+import com.zaggazach.personaldifficulty.config.OverridesLayer;
 import com.zaggazach.personaldifficulty.config.PdConfig;
+import com.zaggazach.personaldifficulty.config.SetResult;
+import com.zaggazach.personaldifficulty.config.SettingDef;
+import com.zaggazach.personaldifficulty.config.SettingRegistry;
+import com.zaggazach.personaldifficulty.config.StrictValue;
 import com.zaggazach.personaldifficulty.logic.EliteSurvival;
 import com.zaggazach.personaldifficulty.logic.SelectionPolicy;
 import com.zaggazach.personaldifficulty.store.AvailabilityPolicy;
@@ -62,7 +71,12 @@ public final class PdCommands {
 		root.then(
 			Commands.literal("admin")
 				.requires(PdPermissions.adminRequirement())
-				.then(Commands.literal("config").executes(PdCommands::adminConfig))
+				.then(Commands.literal("config").executes(PdCommands::adminConfig)
+					.then(Commands.argument("prefix", StringArgumentType.word()).suggests(CONFIG_PREFIXES).executes(PdCommands::adminConfig)))
+				.then(Commands.literal("get").then(Commands.argument("key", StringArgumentType.word()).suggests(SETTING_KEYS).executes(PdCommands::adminGet)))
+				.then(Commands.literal("set").then(Commands.argument("key", StringArgumentType.word()).suggests(SETTING_KEYS)
+					.then(Commands.argument("value", StringArgumentType.word()).suggests(VALUE_HINTS).executes(PdCommands::adminSet))))
+				.then(Commands.literal("unset").then(Commands.argument("key", StringArgumentType.word()).suggests(OVERRIDDEN_KEYS).executes(PdCommands::adminUnset)))
 				.then(Commands.literal("reload").executes(PdCommands::adminReload))
 				.then(Commands.literal("difficulties").executes(PdCommands::adminDifficulties))
 				.then(Commands.literal("enable").then(Commands.argument("difficulty", StringArgumentType.word()).suggests(ENABLEABLE).executes(ctx -> adminSetEnabled(ctx, true))))
@@ -131,6 +145,64 @@ public final class PdCommands {
 	private static final SuggestionProvider<CommandSourceStack> DISABLEABLE = (ctx, builder) -> {
 		PdRuntime rt = PdRuntime.get();
 		return SharedSuggestionProvider.suggest(rt == null ? List.<String>of() : rt.availability().enabledModes().stream().map(PersonalDifficultyMode::commandName).toList(), builder);
+	};
+
+	/** Setting keys; the damage-type family is offered as its prefixes and, once a prefix is typed, as the live server's damage types. */
+	private static final SuggestionProvider<CommandSourceStack> SETTING_KEYS = (ctx, builder) -> {
+		PdRuntime rt = PdRuntime.get();
+		List<String> out = new ArrayList<>();
+		if (rt != null) {
+			SettingRegistry.scalars().forEach(d -> out.add(d.key()));
+			String typed = builder.getRemaining().toLowerCase(Locale.ROOT);
+			for (FamilyDef f : SettingRegistry.families()) {
+				out.add(f.prefix());
+				if (typed.startsWith(f.prefix())) {
+					rt.damageTypes().ids().forEach(id -> out.add(f.prefix() + id.replace(':', '.')));
+				}
+			}
+		}
+		return SharedSuggestionProvider.suggest(out, builder);
+	};
+
+	/** Keys that currently have an override (what {@code unset} can remove). */
+	private static final SuggestionProvider<CommandSourceStack> OVERRIDDEN_KEYS = (ctx, builder) -> {
+		PdRuntime rt = PdRuntime.get();
+		List<String> out = new ArrayList<>();
+		if (rt != null) {
+			OverridesLayer layer = rt.overrides().layer();
+			out.addAll(layer.scalars().keySet());
+			layer.family().forEach((profile, entries) -> entries.keySet().forEach(id -> out.add(profile + ".damage-type." + id.replace(':', '.'))));
+		}
+		return SharedSuggestionProvider.suggest(out, builder);
+	};
+
+	private static final SuggestionProvider<CommandSourceStack> CONFIG_PREFIXES = (ctx, builder) ->
+		SharedSuggestionProvider.suggest(List.of("easy.", "hard.", "elite.", "elite.ai.", "elite.effects.", "elite.priority.", "pvp.", "self.", "ranged.", "environmental.", "void.", "admin."), builder);
+
+	/** Value hints for {@code admin set <key> <value>}: true/false, or the current value, the default and the bounds. */
+	private static final SuggestionProvider<CommandSourceStack> VALUE_HINTS = (ctx, builder) -> {
+		PdRuntime rt = PdRuntime.get();
+		List<String> out = new ArrayList<>();
+		try {
+			String key = StringArgumentType.getString(ctx, "key");
+			Optional<SettingDef> def = SettingRegistry.find(key);
+			if (rt != null && def.isPresent()) {
+				SettingDef d = def.get();
+				if (d.type() == SettingDef.Type.BOOL) {
+					out.addAll(List.of("true", "false"));
+				} else {
+					out.add(StrictValue.format(rt.state().effectiveValue(d)));
+					out.add(StrictValue.format(d.defaultValue()));
+					out.add(d.type() == SettingDef.Type.INT ? Integer.toString((int) d.min()) : Double.toString(d.min()));
+					out.add(d.type() == SettingDef.Type.INT ? Integer.toString((int) d.max()) : Double.toString(d.max()));
+				}
+			} else if (rt != null) {
+				out.addAll(List.of("0.5", "1.0", "2.0"));
+			}
+		} catch (RuntimeException ignored) {
+			// no key typed yet: nothing to hint
+		}
+		return SharedSuggestionProvider.suggest(out.stream().distinct().toList(), builder);
 	};
 
 	// ------------------------------------------------------------------ helpers
@@ -337,13 +409,87 @@ public final class PdCommands {
 
 	// ------------------------------------------------------------------ administrative (op level 2)
 
+	/**
+	 * Unfiltered: the server overview (with every Phase 1 diagnostic line), the state of the overrides file, then the table of
+	 * every effective setting with its source. With a prefix: the overrides banner and only the matching rows.
+	 */
 	private static int adminConfig(CommandContext<CommandSourceStack> ctx) {
 		PdRuntime rt = runtime();
 		if (notRunning(ctx.getSource(), rt)) {
 			return 0;
 		}
-		ctx.getSource().sendSuccess(() -> Component.literal(serverOverview(rt)), false);
+		String prefix = null;
+		try {
+			prefix = StringArgumentType.getString(ctx, "prefix");
+		} catch (IllegalArgumentException noPrefix) {
+			// unfiltered
+		}
+		CommandSourceStack source = ctx.getSource();
+		if (prefix == null) {
+			source.sendSuccess(() -> Component.literal(serverOverview(rt)), false);
+		}
+		ConfigState state = rt.state();
+		for (String line : ConfigReport.banner(state, rt.overrides())) {
+			source.sendSuccess(() -> Component.literal(line), false);
+		}
+		for (String message : ConfigReport.table(state, rt.overrides(), prefix)) {
+			source.sendSuccess(() -> Component.literal(message), false);
+		}
 		return 1;
+	}
+
+	private static int adminGet(CommandContext<CommandSourceStack> ctx) {
+		CommandSourceStack source = ctx.getSource();
+		PdRuntime rt = runtime();
+		if (notRunning(source, rt)) {
+			return 0;
+		}
+		String key = StringArgumentType.getString(ctx, "key");
+		ConfigState state = rt.state();
+		List<String> lines;
+		Optional<SettingDef> def = SettingRegistry.find(key);
+		if (def.isPresent()) {
+			lines = ConfigReport.describe(def.get(), state, rt.overrides());
+		} else {
+			FamilyKey.Parsed fk = FamilyKey.parse(key);
+			if (fk instanceof FamilyKey.Ok ok) {
+				lines = ConfigReport.describe(ok.key(), state, rt.overrides(), rt.damageTypes().exists(ok.key().id()));
+			} else if (fk instanceof FamilyKey.Invalid invalid) {
+				source.sendFailure(Component.literal("Invalid damage-type key '" + key + "': " + invalid.message() + "."));
+				return 0;
+			} else {
+				source.sendFailure(Component.literal(PdRuntime.unknownKey(key)));
+				return 0;
+			}
+		}
+		source.sendSuccess(() -> Component.literal(String.join("\n", lines)), false);
+		return 1;
+	}
+
+	private static int adminSet(CommandContext<CommandSourceStack> ctx) {
+		PdRuntime rt = runtime();
+		if (notRunning(ctx.getSource(), rt)) {
+			return 0;
+		}
+		return report(ctx.getSource(), rt.setValue(StringArgumentType.getString(ctx, "key"), StringArgumentType.getString(ctx, "value")));
+	}
+
+	private static int adminUnset(CommandContext<CommandSourceStack> ctx) {
+		PdRuntime rt = runtime();
+		if (notRunning(ctx.getSource(), rt)) {
+			return 0;
+		}
+		return report(ctx.getSource(), rt.unsetValue(StringArgumentType.getString(ctx, "key")));
+	}
+
+	/** Changes are broadcast to operators and logged; refusals go to the sender only. */
+	private static int report(CommandSourceStack source, SetResult result) {
+		switch (result.kind()) {
+			case APPLIED -> source.sendSuccess(() -> Component.literal(result.message()), true);
+			case UNCHANGED -> source.sendSuccess(() -> Component.literal(result.message()), false);
+			case REFUSED -> source.sendFailure(Component.literal(result.message()));
+		}
+		return result.ok() ? 1 : 0;
 	}
 
 	private static int adminReload(CommandContext<CommandSourceStack> ctx) {
@@ -353,8 +499,7 @@ public final class PdCommands {
 			return 0;
 		}
 		PdRuntime.Reload result = rt.reload();
-		List<String> problems = new ArrayList<>(result.config().warnings());
-		problems.addAll(result.availability().warnings());
+		List<String> problems = new ArrayList<>(result.warnings()); // each distinct problem once, across the three layers
 		// a players file that is currently refused (corrupt, unsupported, a directory) is re-read; a healthy one is never replaced
 		boolean stillBlocked = false;
 		if (rt.settings().writeBlockedReason() != null) {
@@ -367,15 +512,25 @@ public final class PdCommands {
 			}
 		}
 		if (result.anyFailed()) {
-			String which = (result.config().readFailed() ? "config" : "") + (result.config().readFailed() && result.availability().failed() ? " and " : "") + (result.availability().failed() ? "availability policy" : "");
-			source.sendFailure(Component.literal("Reload incomplete: the " + which + " could not be applied, so the previous values stay in force. " + String.join("; ", problems)));
+			List<String> failed = new ArrayList<>();
+			if (result.config().readFailed()) {
+				failed.add("config");
+			}
+			if (result.overridesFailed()) {
+				failed.add("overrides file");
+			}
+			if (result.availability().failed()) {
+				failed.add("availability policy");
+			}
+			source.sendFailure(Component.literal("Reload incomplete: the " + String.join(" and ", failed) + " could not be applied, so the previous values stay in force. "
+				+ (result.overridesBlocked() == null ? "" : "Setting changes are refused until the overrides file is fixed: " + result.overridesBlocked() + " ") + String.join("; ", problems)));
 			return 0;
 		}
 		if (stillBlocked) {
 			return 0; // config and availability were applied, but the players file is still unusable (reported above)
 		}
 		String warn = problems.isEmpty() ? "" : " Warnings: " + String.join("; ", problems);
-		source.sendSuccess(() -> Component.literal("Config and difficulty availability reloaded; applies immediately to everyone, no reconnect needed." + warn), true);
+		source.sendSuccess(() -> Component.literal("Config, setting overrides and difficulty availability reloaded; applies immediately to everyone, no reconnect needed." + warn), true);
 		return 1;
 	}
 

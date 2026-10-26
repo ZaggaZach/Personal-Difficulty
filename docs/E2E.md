@@ -10,6 +10,10 @@ Difficulty needs: `ServerRunner`, `Bot`, `E2e` and the smoke test, plus a test-o
   being rewritten, then migrates with a byte-identical backup on the first change; a newer-format file is read but never overwritten.
   A corrupt file at startup is visible to administrators, never overwritten, and `admin reload` recovers it without a restart; an invalid
   stored record is quarantined across restarts until `admin reset` repairs it with a verified backup.
+* `ConfigE2eTest` (Phase 2): an override survives a graceful restart and a SIGKILL, a burst of `set`/`unset` commands killed mid-stream never leaves a
+  corrupt overrides file or loses an unrelated override, `personaldifficulty.properties` stays byte-identical, a corrupt overrides file at startup is
+  loud (ERROR line, logged once), never overwritten and recoverable with `admin reload`, and invalid or unknown entries are preserved, reported once and
+  replaceable by an explicit valid `set` after a verified backup.
 
 ## What it is
 `./gradlew e2eTest` starts a REAL Fabric dedicated server process (installed with the official Fabric installer) with three mods in

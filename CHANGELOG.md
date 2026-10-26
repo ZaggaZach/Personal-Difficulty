@@ -20,6 +20,20 @@ Not released; the mod version is unchanged. Elite behaviour is unchanged.
   self-selection (entering Peaceful clears harmful effects). Offline players need no hook.
 * Tab-completion offers a player exactly what they can choose now (none while locked).
 
+### Added (Phase 2: settings you can change with commands)
+* **`SettingRegistry`**: the single table of every configurable setting (key, type, bounds, default, step, display text, apply timing),
+  and a registry-driven properties loader whose behaviour (clamping, fallbacks, warning texts) is pinned against a frozen copy of the
+  previous loader by a differential test suite.
+* **Settings overrides layer**: defaults, then `personaldifficulty.properties` (still hand-edited; the mod only creates it from the default template when it is missing and never changes an existing one), then
+  `personaldifficulty-overrides.json` (written only by `admin set`/`unset`). New commands `admin get <key>`, `admin set <key> <value>`,
+  `admin unset <key>`; `admin config [prefix]` now also lists every effective setting with its source (default, properties or override). Damage-type
+  multipliers (`<mode>.damage-type.<ns>.<path>`) are supported.
+* A value equal to the one below the override layer is not stored; it removes the override instead (documented in the README).
+* The overrides file has the Phase 1 safety principles: atomic writes with byte-verified backups (newest five kept), never overwriting a corrupt,
+  unsupported or externally modified file, `.evidence-` copies that are never pruned, duplicate-key detection, unknown and invalid entries preserved,
+  and an explicit recovery path (`admin reload`). `admin reload` now re-reads the properties file, the overrides file and the availability file, each
+  keeping its last good data when its file cannot be used.
+
 ### Fixed (found by the Phase 1 risk audit)
 * **Invalid stored records fail closed.** An entry with an invalid known field used to be ignored, so the player silently became
   an unrestricted Normal player (dropping a lock, an allow-list and their stored mode). Such entries are now quarantined: kept
