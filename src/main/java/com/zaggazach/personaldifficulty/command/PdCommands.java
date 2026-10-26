@@ -7,18 +7,28 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.zaggazach.personaldifficulty.PdHooks;
+import com.zaggazach.personaldifficulty.PdPermissions;
 import com.zaggazach.personaldifficulty.PdRuntime;
 import com.zaggazach.personaldifficulty.PersonalDifficultyMode;
 import com.zaggazach.personaldifficulty.config.PdConfig;
 import com.zaggazach.personaldifficulty.logic.EliteSurvival;
+import com.zaggazach.personaldifficulty.logic.SelectionPolicy;
 import com.zaggazach.personaldifficulty.store.AvailabilityPolicy;
+import com.zaggazach.personaldifficulty.store.PlayerRecord;
+import com.zaggazach.personaldifficulty.store.PlayerSettings;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -51,7 +61,7 @@ public final class PdCommands {
 		root.then(Commands.argument("difficulty", StringArgumentType.word()).suggests(SELECTABLE).executes(PdCommands::select));
 		root.then(
 			Commands.literal("admin")
-				.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
+				.requires(PdPermissions.adminRequirement())
 				.then(Commands.literal("config").executes(PdCommands::adminConfig))
 				.then(Commands.literal("reload").executes(PdCommands::adminReload))
 				.then(Commands.literal("difficulties").executes(PdCommands::adminDifficulties))
@@ -59,6 +69,15 @@ public final class PdCommands {
 				.then(Commands.literal("disable").then(Commands.argument("difficulty", StringArgumentType.word()).suggests(DISABLEABLE).executes(ctx -> adminSetEnabled(ctx, false))))
 				.then(Commands.literal("status").then(Commands.argument("player", GameProfileArgument.gameProfile()).executes(PdCommands::adminStatus)))
 				.then(Commands.literal("reset").then(Commands.argument("player", GameProfileArgument.gameProfile()).executes(PdCommands::adminReset)))
+				.then(Commands.literal("assign").then(Commands.argument("player", GameProfileArgument.gameProfile())
+					.then(Commands.argument("difficulty", StringArgumentType.word()).suggests(ALL_MODES)
+						.executes(ctx -> adminAssign(ctx, false))
+						.then(Commands.literal("lock").executes(ctx -> adminAssign(ctx, true))))))
+				.then(Commands.literal("lock").then(Commands.argument("player", GameProfileArgument.gameProfile()).executes(ctx -> adminSetLock(ctx, true))))
+				.then(Commands.literal("unlock").then(Commands.argument("player", GameProfileArgument.gameProfile()).executes(ctx -> adminSetLock(ctx, false))))
+				.then(Commands.literal("restrict").then(Commands.argument("player", GameProfileArgument.gameProfile())
+					.then(Commands.argument("modes", StringArgumentType.greedyString()).suggests(RESTRICT_ARGS).executes(PdCommands::adminRestrict))))
+				.then(Commands.literal("unrestrict").then(Commands.argument("player", GameProfileArgument.gameProfile()).executes(PdCommands::adminUnrestrict)))
 		);
 		dispatcher.register(root);
 	}
@@ -68,7 +87,29 @@ public final class PdCommands {
 	/** What an ordinary player may pick right now: enabled difficulties only. */
 	private static final SuggestionProvider<CommandSourceStack> SELECTABLE = (ctx, builder) -> {
 		PdRuntime rt = PdRuntime.get();
-		return SharedSuggestionProvider.suggest(rt == null ? List.<String>of() : rt.availability().enabledModes().stream().map(PersonalDifficultyMode::commandName).toList(), builder);
+		if (rt == null) {
+			return SharedSuggestionProvider.suggest(List.<String>of(), builder);
+		}
+		ServerPlayer player = ctx.getSource().getPlayer();
+		Collection<PersonalDifficultyMode> offered = player == null
+			? rt.availability().enabledModes()
+			: SelectionPolicy.selectable(rt.settings().record(player.getUUID()), rt.availability().enabledModes());
+		return SharedSuggestionProvider.suggest(offered.stream().map(PersonalDifficultyMode::commandName).toList(), builder);
+	};
+
+	/** Administrators can assign any mode, whatever the global policy says. */
+	private static final SuggestionProvider<CommandSourceStack> ALL_MODES = (ctx, builder) ->
+		SharedSuggestionProvider.suggest(Arrays.stream(PersonalDifficultyMode.values()).map(PersonalDifficultyMode::commandName).toList(), builder);
+
+	/** {@code <mode>[,<mode>...] [switch|keep]}: completes the mode being typed, then the flag. */
+	private static final SuggestionProvider<CommandSourceStack> RESTRICT_ARGS = (ctx, builder) -> {
+		String typed = builder.getRemaining();
+		int space = typed.lastIndexOf(' ');
+		if (space >= 0) {
+			return SharedSuggestionProvider.suggest(List.of("switch", "keep"), builder.createOffset(builder.getStart() + space + 1));
+		}
+		int comma = typed.lastIndexOf(',');
+		return SharedSuggestionProvider.suggest(Arrays.stream(PersonalDifficultyMode.values()).map(PersonalDifficultyMode::commandName).toList(), builder.createOffset(builder.getStart() + comma + 1));
 	};
 
 	private static final SuggestionProvider<CommandSourceStack> ENABLEABLE = (ctx, builder) -> {
@@ -107,7 +148,7 @@ public final class PdCommands {
 	}
 
 	private static String names(Collection<PersonalDifficultyMode> modes) {
-		return modes.stream().map(PersonalDifficultyMode::commandName).collect(Collectors.joining(", "));
+		return modes.stream().sorted().map(PersonalDifficultyMode::commandName).collect(Collectors.joining(", "));
 	}
 
 	private static String upper(PersonalDifficultyMode m) {
@@ -135,17 +176,47 @@ public final class PdCommands {
 			source.sendFailure(Component.literal("Only a player can choose a personal difficulty. Use '/personaldifficulty admin ...' from the console."));
 			return 0;
 		}
-		PersonalDifficultyMode current = rt.modeOf(player.getUUID());
-		if (!rt.availability().isEnabled(mode)) {
-			source.sendFailure(Component.literal(
-				upper(mode) + " is currently disabled by the server, so it cannot be selected. Your difficulty is unchanged (" + upper(current)
-					+ "). Available: " + names(rt.availability().enabledModes()) + "."
-			));
-			return 0;
-		}
-		if (current == mode) {
-			source.sendSuccess(() -> Component.literal("Your personal difficulty is already " + upper(mode) + "; nothing changed."), false);
-			return 1;
+		PlayerRecord record = rt.settings().record(player.getUUID());
+		PersonalDifficultyMode current = record.mode();
+		// R8: an operator choosing their own difficulty is an ordinary player; only 'admin assign' overrides.
+		SelectionPolicy.Actor actor = PdPermissions.canAdminister(player) ? SelectionPolicy.Actor.OPERATOR_SELF : SelectionPolicy.Actor.PLAYER;
+		SelectionPolicy.Verdict verdict = SelectionPolicy.decide(actor, record, mode, rt.availability().enabledModes());
+		Set<PersonalDifficultyMode> selectable = SelectionPolicy.selectable(record, rt.availability().enabledModes());
+		switch (verdict) {
+			case REFUSED_INVALID_RECORD -> {
+				source.sendFailure(Component.literal(
+					"Your saved difficulty settings could not be read, so they cannot be changed until an administrator repairs them. Your difficulty is treated as locked on "
+						+ upper(current) + ". (Ask an administrator to check '/personaldifficulty admin status " + player.getName().getString() + "'.)"
+				));
+				return 0;
+			}
+			case REFUSED_LOCKED -> {
+				source.sendFailure(Component.literal(
+					"Your personal difficulty is locked by an administrator, so you cannot change it. Only an administrator can unlock it. Your difficulty is unchanged (" + upper(current) + ")."
+				));
+				return 0;
+			}
+			case REFUSED_DISABLED -> {
+				source.sendFailure(Component.literal(
+					upper(mode) + " is currently disabled by the server, so it cannot be selected. Your difficulty is unchanged (" + upper(current)
+						+ "). Available: " + names(selectable) + "."
+				));
+				return 0;
+			}
+			case REFUSED_NOT_IN_ALLOW_LIST -> {
+				source.sendFailure(Component.literal(
+					upper(mode) + " is not in the list of difficulties an administrator allows you, so it cannot be selected. Your difficulty is unchanged (" + upper(current)
+						+ "). Available to you: " + names(selectable) + "."
+				));
+				return 0;
+			}
+			case UNCHANGED -> {
+				source.sendSuccess(() -> Component.literal("Your personal difficulty is already " + upper(mode) + "; nothing changed."), false);
+				return 1;
+			}
+			case ALLOWED -> {
+				// proceed
+			}
 		}
 		try {
 			rt.settings().set(player.getUUID(), mode);
@@ -173,16 +244,25 @@ public final class PdCommands {
 			source.sendSuccess(() -> Component.literal(serverOverview(rt)), false);
 			return 1;
 		}
-		PersonalDifficultyMode mode = rt.modeOf(player.getUUID());
+		PlayerRecord record = rt.settings().record(player.getUUID());
+		PersonalDifficultyMode mode = record.mode();
 		String world = player.level().getDifficulty().name();
 		String restricted = rt.availability().isEnabled(mode) ? ""
 			: "\nNote: " + upper(mode) + " is currently disabled by the server for NEW selections. Your existing selection is kept, but once you switch away you cannot switch back.";
+		String lock = record.quarantined()
+			? "\nYour saved settings could not be read, so your difficulty is treated as locked until an administrator repairs them."
+			: record.locked() ? "\nYour difficulty is locked by an administrator; only an administrator can change it." : "";
+		String allowList = record.allowed() == null ? ""
+			: "\nAn administrator limits you to: " + names(record.allowed()) + (record.isException() ? " (your current " + upper(mode) + " is a kept exception; once you switch away you cannot switch back)." : ".");
+		Set<PersonalDifficultyMode> selectable = SelectionPolicy.selectable(record, rt.availability().enabledModes());
 		source.sendSuccess(() -> Component.literal(
 			"Personal difficulty: " + upper(mode)
 				+ "\nWorld difficulty: " + world + " (unchanged by this mod)"
 				+ "\n" + describeEffect(rt.config(), mode)
 				+ restricted
-				+ "\nYou can select: " + names(rt.availability().enabledModes())
+				+ lock
+				+ allowList
+				+ "\nYou can select: " + (selectable.isEmpty() ? "nothing right now" : names(selectable))
 		), false);
 		return 1;
 	}
@@ -242,7 +322,12 @@ public final class PdCommands {
 
 	private static String serverOverview(PdRuntime rt) {
 		return "Personal Difficulty (server overview)"
-			+ "\nPlayers with a non-default selection: " + rt.settings().explicitCount()
+			+ "\nPlayers with a stored record: " + rt.settings().explicitCount()
+			+ " (locked: " + rt.settings().lockedCount() + ", restricted to an allow-list: " + rt.settings().restrictedCount() + ")"
+			+ (rt.settings().writeBlockedReason() == null ? "" : "\nWARNING: changes to players cannot be saved: " + rt.settings().writeBlockedReason())
+			+ (rt.settings().quarantinedCount() == 0 ? "" : "\nWARNING: " + rt.settings().quarantinedCount() + " player(s) have an INVALID stored record (kept verbatim, treated as locked); see 'admin status <player>' and repair with 'admin reset <player>'")
+			+ (rt.settings().loadState() == PlayerSettings.LoadState.OK || rt.settings().loadState() == PlayerSettings.LoadState.NOT_PRESENT || rt.settings().loadWarnings().isEmpty() ? ""
+				: "\nWhen the players file was loaded (" + rt.settings().loadState() + "): " + String.join(" | ", rt.settings().loadWarnings().stream().limit(5).toList()))
 			+ "\nConfig file: " + rt.configFile()
 			+ "\nSelectable difficulties: " + names(rt.availability().enabledModes())
 			+ "\nEASY: " + describeEffect(rt.config(), PersonalDifficultyMode.EASY)
@@ -270,10 +355,24 @@ public final class PdCommands {
 		PdRuntime.Reload result = rt.reload();
 		List<String> problems = new ArrayList<>(result.config().warnings());
 		problems.addAll(result.availability().warnings());
+		// a players file that is currently refused (corrupt, unsupported, a directory) is re-read; a healthy one is never replaced
+		boolean stillBlocked = false;
+		if (rt.settings().writeBlockedReason() != null) {
+			if (rt.settings().reloadIfBlocked()) {
+				problems.add("the players file is usable again (" + rt.settings().loadState() + ")");
+				problems.addAll(rt.settings().loadWarnings());
+			} else {
+				stillBlocked = true;
+				source.sendFailure(Component.literal("The players file still cannot be used, so changes to players are still refused: " + rt.settings().writeBlockedReason()));
+			}
+		}
 		if (result.anyFailed()) {
 			String which = (result.config().readFailed() ? "config" : "") + (result.config().readFailed() && result.availability().failed() ? " and " : "") + (result.availability().failed() ? "availability policy" : "");
 			source.sendFailure(Component.literal("Reload incomplete: the " + which + " could not be applied, so the previous values stay in force. " + String.join("; ", problems)));
 			return 0;
+		}
+		if (stillBlocked) {
+			return 0; // config and availability were applied, but the players file is still unusable (reported above)
 		}
 		String warn = problems.isEmpty() ? "" : " Warnings: " + String.join("; ", problems);
 		source.sendSuccess(() -> Component.literal("Config and difficulty availability reloaded; applies immediately to everyone, no reconnect needed." + warn), true);
@@ -356,9 +455,38 @@ public final class PdCommands {
 		}
 		Collection<NameAndId> targets = GameProfileArgument.getGameProfiles(ctx, "player");
 		for (NameAndId p : targets) {
-			PersonalDifficultyMode mode = rt.modeOf(p.id());
-			String restricted = rt.availability().isEnabled(mode) ? "" : " (currently disabled for new selections; kept)";
-			ctx.getSource().sendSuccess(() -> Component.literal(p.name() + " (" + p.id() + "): " + upper(mode) + restricted), false);
+			PlayerRecord rec = rt.settings().record(p.id());
+			PersonalDifficultyMode mode = rec.mode();
+			Optional<PlayerSettings.Quarantine> invalid = rt.settings().quarantineOf(p.id());
+			if (invalid.isPresent()) {
+				PlayerSettings.Quarantine q = invalid.get();
+				ctx.getSource().sendSuccess(() -> Component.literal(
+					p.name() + " (" + p.id() + "): INVALID STORED RECORD, kept verbatim in players.json and NOT trusted"
+						+ "\n  reason: " + q.reason()
+						+ "\n  stored: " + q.rawJson()
+						+ "\n  in force: treated as LOCKED on " + upper(q.salvagedMode()) + " (the mode is used only if the stored mode field alone was valid); no allow-list"
+						+ "\n  every change for this player is refused until you run '/personaldifficulty admin reset " + p.name() + "' (a verified backup is made first; unknown fields are kept)"
+				), false);
+				continue;
+			}
+			StringBuilder sb = new StringBuilder(p.name() + " (" + p.id() + "): " + upper(mode));
+			if (!rt.availability().isEnabled(mode)) {
+				sb.append(" (currently disabled for new selections; kept)");
+			}
+			sb.append("\n  locked: ").append(rec.locked() ? "YES (players cannot change it themselves)" : "no");
+			if (rec.allowed() == null) {
+				sb.append("\n  allow-list: none (follows the server policy)");
+			} else {
+				sb.append("\n  allow-list: ").append(names(rec.allowed()));
+				if (rec.isException()) {
+					sb.append(" (current mode ").append(upper(mode)).append(" is outside it: kept as an exception)");
+				}
+			}
+			if (rec.by() != null || rec.at() != 0L) {
+				sb.append("\n  last administrative change: ").append(rec.by() == null ? "console/command block" : rec.by().toString())
+					.append(rec.at() == 0L ? "" : " at " + Instant.ofEpochMilli(rec.at()));
+			}
+			ctx.getSource().sendSuccess(() -> Component.literal(sb.toString()), false);
 		}
 		return targets.size();
 	}
@@ -370,17 +498,230 @@ public final class PdCommands {
 		}
 		int done = 0;
 		for (NameAndId p : GameProfileArgument.getGameProfiles(ctx, "player")) {
-			if (!rt.settings().hasExplicit(p.id())) {
-				ctx.getSource().sendSuccess(() -> Component.literal(p.name() + " (" + p.id() + ") has no stored selection; already NORMAL. Nothing changed."), false);
+			if (rt.settings().isQuarantined(p.id())) {
+				// the explicit recovery path for an unreadable stored entry: verified backup first, then replace
+				try {
+					PlayerSettings.Repair repair = rt.settings().repairQuarantined(p.id());
+					if (repair != null) {
+						done++;
+						String backup = repair.backup() == null ? "no file to back up" : "backup: " + repair.backup().getFileName();
+						String kept = repair.keptUnknownFields().isEmpty() ? "" : " Unknown fields kept: " + repair.keptUnknownFields() + ".";
+						ctx.getSource().sendSuccess(() -> Component.literal(p.name() + ": the invalid stored record was replaced by a default one (NORMAL, unlocked, no allow-list). "
+							+ "The old entry, including its invalid values, is in the verified " + backup + "." + kept), true);
+					}
+				} catch (IOException e) {
+					ctx.getSource().sendFailure(Component.literal("Could not repair " + p.name() + ", so nothing was changed: " + e.getMessage()));
+				}
 				continue;
 			}
-			try {
-				PersonalDifficultyMode before = rt.modeOf(p.id());
-				rt.settings().set(p.id(), PersonalDifficultyMode.NORMAL);
+			if (!rt.settings().hasExplicit(p.id())) {
+				ctx.getSource().sendSuccess(() -> Component.literal(p.name() + " (" + p.id() + ") has no stored selection, lock or allow-list; already NORMAL. Nothing changed."), false);
+				continue;
+			}
+			// R7: Normal, lock cleared, allow-list cleared (unknown stored fields are kept)
+			PlayerRecord before = rt.settings().record(p.id());
+			PlayerRecord after = new PlayerRecord(PersonalDifficultyMode.NORMAL, false, null, null, 0L, before.extras());
+			if (applyAdministrative(ctx.getSource(), rt, p, before, after, p.name() + " reset to NORMAL (was " + upper(before.mode())
+				+ (before.locked() ? ", lock cleared" : "") + (before.allowed() != null ? ", allow-list cleared" : "") + ").", "reset")) {
 				done++;
-				ctx.getSource().sendSuccess(() -> Component.literal(p.name() + " reset to NORMAL (was " + upper(before) + ")."), true);
-			} catch (IOException e) {
-				ctx.getSource().sendFailure(Component.literal("Could not reset " + p.name() + " (unchanged): " + e.getMessage()));
+			}
+		}
+		return done;
+	}
+
+	// ------------------------------------------------------------------ administrative player commands (1.4.0)
+
+	/**
+	 * Stores {@code after} for the player and, if they are online and their mode changed, runs the same mode-change
+	 * hook as a self-selection (so entering Peaceful clears harmful effects). Reports failures and changes nothing on error.
+	 */
+	private static boolean applyAdministrative(CommandSourceStack source, PdRuntime rt, NameAndId target, PlayerRecord before, PlayerRecord after, String success, String verb) {
+		try {
+			rt.settings().put(target.id(), after);
+		} catch (IOException e) {
+			source.sendFailure(Component.literal("Could not " + verb + " " + target.name() + ", so nothing was changed: " + e.getMessage()));
+			return false;
+		}
+		if (before.mode() != after.mode()) {
+			ServerPlayer online = source.getServer().getPlayerList().getPlayer(target.id());
+			if (online != null) {
+				PdHooks.onModeChanged(online, before.mode(), after.mode());
+			}
+		}
+		source.sendSuccess(() -> Component.literal(success), true);
+		return true;
+	}
+
+	/** An unreadable stored record is never modified by an ordinary change: say so and point to the explicit repair. */
+	private static boolean refuseInvalidRecord(CommandSourceStack source, PdRuntime rt, NameAndId target) {
+		Optional<PlayerSettings.Quarantine> q = rt.settings().quarantineOf(target.id());
+		if (q.isEmpty()) {
+			return false;
+		}
+		source.sendFailure(Component.literal("Refused: " + target.name() + " has an invalid stored record (" + q.get().reason() + "), which is kept untouched. Nothing changed. "
+			+ "Repair it first with '/personaldifficulty admin reset " + target.name() + "' (a verified backup is made first)."));
+		return true;
+	}
+
+	private static @Nullable UUID actingAdmin(CommandSourceStack source) {
+		ServerPlayer player = source.getPlayer();
+		return player == null ? null : player.getUUID();
+	}
+
+	private static int adminAssign(CommandContext<CommandSourceStack> ctx, boolean lock) throws CommandSyntaxException {
+		CommandSourceStack source = ctx.getSource();
+		PdRuntime rt = runtime();
+		if (notRunning(source, rt)) {
+			return 0;
+		}
+		String typed = StringArgumentType.getString(ctx, "difficulty");
+		Optional<PersonalDifficultyMode> parsed = PersonalDifficultyMode.parse(typed);
+		if (parsed.isEmpty()) {
+			source.sendFailure(Component.literal("Unknown difficulty '" + typed + "'. Known: " + names(List.of(PersonalDifficultyMode.values())) + "."));
+			return 0;
+		}
+		PersonalDifficultyMode mode = parsed.get();
+		int done = 0;
+		for (NameAndId p : GameProfileArgument.getGameProfiles(ctx, "player")) {
+			if (refuseInvalidRecord(source, rt, p)) {
+				continue;
+			}
+			PlayerRecord before = rt.settings().record(p.id());
+			// R2: administrators may assign any mode regardless of global policy, allow-list or lock
+			PlayerRecord after = before.withMode(mode, actingAdmin(source), System.currentTimeMillis());
+			if (lock) {
+				after = after.withLocked(true, actingAdmin(source), System.currentTimeMillis());
+			}
+			if (after.sameState(before)) {
+				source.sendSuccess(() -> Component.literal(p.name() + " is already " + upper(mode) + (lock ? " and locked" : "") + "; nothing changed."), false);
+				continue;
+			}
+			SelectionPolicy.Verdict own = SelectionPolicy.decide(SelectionPolicy.Actor.PLAYER, before, mode, rt.availability().enabledModes());
+			String override = own.refused() ? " (an administrator override: the player could not have chosen this themselves)" : "";
+			String lockNote = after.locked() ? " Locked: only an administrator can change it." : "";
+			if (applyAdministrative(source, rt, p, before, after, p.name() + " is now " + upper(mode) + "." + lockNote + override, "assign")) {
+				done++;
+			}
+		}
+		return done;
+	}
+
+	private static int adminSetLock(CommandContext<CommandSourceStack> ctx, boolean lock) throws CommandSyntaxException {
+		CommandSourceStack source = ctx.getSource();
+		PdRuntime rt = runtime();
+		if (notRunning(source, rt)) {
+			return 0;
+		}
+		int done = 0;
+		for (NameAndId p : GameProfileArgument.getGameProfiles(ctx, "player")) {
+			if (refuseInvalidRecord(source, rt, p)) {
+				continue;
+			}
+			PlayerRecord before = rt.settings().record(p.id());
+			if (before.locked() == lock) {
+				source.sendSuccess(() -> Component.literal(p.name() + " is already " + (lock ? "locked" : "unlocked") + "; nothing changed."), false);
+				continue;
+			}
+			PlayerRecord after = before.withLocked(lock, actingAdmin(source), System.currentTimeMillis());
+			String msg = lock
+				? p.name() + " is now locked on " + upper(before.mode()) + "; only an administrator can change it."
+				: p.name() + " is unlocked; they can choose again" + (before.allowed() == null ? "." : " (within their allow-list: " + names(before.allowed()) + ").");
+			if (applyAdministrative(source, rt, p, before, after, msg, lock ? "lock" : "unlock")) {
+				done++;
+			}
+		}
+		return done;
+	}
+
+	private static int adminUnrestrict(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+		CommandSourceStack source = ctx.getSource();
+		PdRuntime rt = runtime();
+		if (notRunning(source, rt)) {
+			return 0;
+		}
+		int done = 0;
+		for (NameAndId p : GameProfileArgument.getGameProfiles(ctx, "player")) {
+			if (refuseInvalidRecord(source, rt, p)) {
+				continue;
+			}
+			PlayerRecord before = rt.settings().record(p.id());
+			if (before.allowed() == null) {
+				source.sendSuccess(() -> Component.literal(p.name() + " has no allow-list; nothing changed."), false);
+				continue;
+			}
+			PlayerRecord after = before.withAllowed(null, actingAdmin(source), System.currentTimeMillis());
+			if (applyAdministrative(source, rt, p, before, after, p.name() + " is no longer restricted to an allow-list; the server policy applies again" + (before.locked() ? " (still locked)." : "."), "unrestrict")) {
+				done++;
+			}
+		}
+		return done;
+	}
+
+	private static int adminRestrict(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+		CommandSourceStack source = ctx.getSource();
+		PdRuntime rt = runtime();
+		if (notRunning(source, rt)) {
+			return 0;
+		}
+		String[] tokens = StringArgumentType.getString(ctx, "modes").trim().split("\\s+");
+		SelectionPolicy.RestrictFlag flag = SelectionPolicy.RestrictFlag.NONE;
+		if (tokens.length > 2) {
+			source.sendFailure(Component.literal("Usage: admin restrict <player> <mode>[,<mode>...] [switch|keep] (no spaces inside the list)."));
+			return 0;
+		}
+		if (tokens.length == 2) {
+			if (tokens[1].equalsIgnoreCase("switch")) {
+				flag = SelectionPolicy.RestrictFlag.SWITCH;
+			} else if (tokens[1].equalsIgnoreCase("keep")) {
+				flag = SelectionPolicy.RestrictFlag.KEEP;
+			} else {
+				source.sendFailure(Component.literal("Unknown option '" + tokens[1] + "'; expected 'switch' or 'keep' (and no spaces inside the mode list)."));
+				return 0;
+			}
+		}
+		EnumSet<PersonalDifficultyMode> list = EnumSet.noneOf(PersonalDifficultyMode.class);
+		for (String part : tokens[0].split(",", -1)) {
+			if (part.isBlank()) {
+				continue;
+			}
+			Optional<PersonalDifficultyMode> m = PersonalDifficultyMode.parse(part);
+			if (m.isEmpty()) {
+				source.sendFailure(Component.literal("Unknown difficulty '" + part + "'. Known: " + names(List.of(PersonalDifficultyMode.values())) + "."));
+				return 0;
+			}
+			list.add(m.get());
+		}
+		if (list.isEmpty()) {
+			source.sendFailure(Component.literal("An allow-list cannot be empty. Use 'admin unrestrict <player>' to remove a restriction."));
+			return 0;
+		}
+		int done = 0;
+		for (NameAndId p : GameProfileArgument.getGameProfiles(ctx, "player")) {
+			if (refuseInvalidRecord(source, rt, p)) {
+				continue;
+			}
+			PlayerRecord before = rt.settings().record(p.id());
+			SelectionPolicy.RestrictPlan plan = SelectionPolicy.planRestrict(before, list, flag, actingAdmin(source), System.currentTimeMillis());
+			switch (plan.status()) {
+				case REFUSED_INVALID_RECORD -> refuseInvalidRecord(source, rt, p);
+				case REFUSED_EMPTY -> source.sendFailure(Component.literal("An allow-list cannot be empty. Nothing changed."));
+				case NEEDS_CHOICE -> source.sendFailure(Component.literal(
+					"Refused: " + p.name() + " is on " + upper(before.mode()) + ", which is not in the new list (" + names(list) + "). Nothing changed. Re-run with 'switch' (moves them to "
+						+ upper(SelectionPolicy.switchTarget(list)) + ") or 'keep' (they stay on " + upper(before.mode()) + " as an exception outside the list)."
+				));
+				case APPLY -> {
+					PlayerRecord after = plan.result();
+					if (after.sameState(before)) {
+						source.sendSuccess(() -> Component.literal(p.name() + " is already restricted to " + names(list) + "; nothing changed."), false);
+					} else {
+						String how = plan.modeSwitched() ? " They were moved to " + upper(after.mode()) + "."
+							: after.isException() ? " They stay on " + upper(after.mode()) + " as an exception outside the list; once they switch away they cannot switch back." : "";
+						String lockNote = after.locked() ? " They are still locked." : "";
+						if (applyAdministrative(source, rt, p, before, after, p.name() + " is now restricted to " + names(list) + "." + how + lockNote, "restrict")) {
+							done++;
+						}
+					}
+				}
 			}
 		}
 		return done;

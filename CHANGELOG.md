@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased (1.4.0 in progress, Phase 1: per-player control)
+
+Not released; the mod version is unchanged. Elite behaviour is unchanged.
+
+### Added
+* **Per-player lock, allow-list and administrator assignment** with eight explicit rules (README, "Per-player control"):
+  `admin assign <player> <difficulty> [lock]`, `admin lock`, `admin unlock`, `admin restrict <player> <d1>[,<d2>...] [switch|keep]`,
+  `admin unrestrict`; `admin status` shows lock, allow-list, exception and who last changed it. All decisions are made by one
+  pure `SelectionPolicy`; all admin permission checks go through one `PdPermissions.canAdminister`.
+* **`players.json` format v2** (object records: `mode`, `locked`, `allowed`, `by`, `at`) with safe migration: v1 loads
+  unchanged and is not rewritten on load; a timestamped byte-for-byte backup is made before the first v2 write; unknown
+  entries and fields are preserved; writes are atomic and flushed; failed writes roll back; a corrupt file is backed up
+  and a newer-format file is never overwritten.
+
+### Changed
+* `admin reset <player>` now also clears the lock and the allow-list (it still sets Normal).
+* Administrative mode changes to an online player (assign, reset, `restrict ... switch`) now run the same transition hook as
+  self-selection (entering Peaceful clears harmful effects). Offline players need no hook.
+* Tab-completion offers a player exactly what they can choose now (none while locked).
+
+### Fixed (found by the Phase 1 risk audit)
+* **Invalid stored records fail closed.** An entry with an invalid known field used to be ignored, so the player silently became
+  an unrestricted Normal player (dropping a lock, an allow-list and their stored mode). Such entries are now quarantined: kept
+  verbatim, treated as locked, every change refused (even for operators) until `admin reset <player>` repairs them after a verified
+  backup; `admin status` and `admin config` show them.
+* **No more false success.** A change for a player whose entry was kept verbatim used to be reported as saved while the file kept the
+  old entry, so it vanished on restart. Such changes are now refused.
+* **The format version is judged before the structure.** A newer-format file with a different layout (or an uninterpretable version) used to be
+  treated as merely corrupt and could be overwritten. Corrupt and unsupported files are now never overwritten: every change is refused with
+  the reason, until the file is fixed and `admin reload` is run. Blank files are simply empty. A directory at the path is reported as such.
+* A file changed behind the mod's back while the server runs is no longer overwritten by the next save.
+* Identical backups are reused instead of piling up on every restart; every backup is verified byte for byte.
+
+### Compatibility / downgrade
+* **1.3.0 and earlier do not understand v2 object records.** Every player in a v2 `players.json` is an object, so they read **every
+  listed player as Normal and unlocked**, including players whose stored mode was Hard or any other non-Normal mode. A later 1.3.0 write can
+  rewrite the file with a `"version":1` header while keeping the v2 objects, producing a mixed file (1.4.0 reads it correctly).
+  Downgrading is not safe without restoring a suitable backup: stop the server and restore the `players.json.backup-<millis>` made
+  before the first v2 write (changes since then are lost).
+
 ## 1.3.0
 
 Minecraft 26.3, Fabric Loader 0.20.1+, Fabric API 0.165.0+26.3, Java 25. Server-side only. Drop-in upgrade from 1.2.0 (all

@@ -59,7 +59,7 @@ class PlayerSettingsTest {
 		new PlayerSettings(f).set(A, PersonalDifficultyMode.EASY);
 		String json = Files.readString(f);
 		assertTrue(json.contains(A.toString()));
-		assertTrue(json.contains("\"version\":1"));
+		assertTrue(json.contains("\"version\":2"), "1.4.0 writes format v2 (object records); see PlayerSettingsV2Test");
 	}
 
 	@Test

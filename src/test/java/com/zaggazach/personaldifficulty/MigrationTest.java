@@ -147,6 +147,10 @@ class MigrationTest {
 		try (var files = Files.list(dir)) {
 			assertTrue(files.anyMatch(p -> p.getFileName().toString().contains(".backup-")));
 		}
+		// 1.4.0: a file from a newer format is also never overwritten (it used to be rewritten as version 1)
+		String untouched = Files.readString(f);
+		assertThrows(IOException.class, () -> s.set(HARD, PersonalDifficultyMode.HARD));
+		assertEquals(untouched, Files.readString(f));
 	}
 
 	@Test

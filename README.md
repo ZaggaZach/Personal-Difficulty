@@ -56,10 +56,14 @@ error and changes nothing. Choosing the one you already have says "nothing chang
 | `/personaldifficulty admin difficulties` | Show which difficulties are enabled and how many players still use each disabled one |
 | `/personaldifficulty admin disable <difficulty>` | Stop players from newly selecting it (refused if it is the last enabled one) |
 | `/personaldifficulty admin enable <difficulty\|all>` | Allow it again; `all` is the recovery command |
-| `/personaldifficulty admin status <player>` | A player's stored difficulty |
-| `/personaldifficulty admin reset <player>` | Put a player back on Normal |
+| `/personaldifficulty admin status <player>` | A player's stored difficulty, lock, allow-list and who last changed it |
+| `/personaldifficulty admin assign <player> <difficulty> [lock]` | Put a player on any difficulty, **overriding** server policy, allow-list and lock; `lock` also locks them |
+| `/personaldifficulty admin lock <player>` / `unlock <player>` | Stop / allow the player changing their own difficulty |
+| `/personaldifficulty admin restrict <player> <d1>[,<d2>...] [switch\|keep]` | Limit the player to an allow-list of difficulties (see below) |
+| `/personaldifficulty admin unrestrict <player>` | Remove the player's allow-list (a lock is left alone) |
+| `/personaldifficulty admin reset <player>` | Mode **Normal**, lock cleared **and** allow-list cleared. On a player whose stored record is invalid it is the explicit repair (verified backup first) |
 | `/personaldifficulty admin config` | Show the effective server configuration |
-| `/personaldifficulty admin reload` | Re-read the config file **and** the availability file; applies immediately |
+| `/personaldifficulty admin reload` | Re-read the config file **and** the availability file; applies immediately. Also re-reads `players.json` if (and only if) it is currently refused as corrupt, unsupported or changed behind the mod's back |
 
 Permission is enforced by the command parser (not just hidden), so it holds for players, command blocks,
 `/execute` chains and the console. A command block or the console cannot *choose* a difficulty (they are not
@@ -225,6 +229,40 @@ server policy, completely separate from players' saved choices:
   previous policy stays in force.
 * Recover from any mistake with `/personaldifficulty admin enable all`.
 
+## Per-player control: assign, lock and allow-lists (1.4.0)
+
+On top of the server-wide policy, operators can control individual players. The complete rules:
+
+1. **Self-service** (`/personaldifficulty <difficulty>`) is allowed only if the player is **not locked**, the difficulty is
+   **globally enabled**, and it is **in the player's allow-list** (when they have one). Otherwise it is refused with the specific
+   reason and nothing changes. When several reasons apply at once they are reported in this fixed order: unreadable stored
+   record, then lock, then server policy, then the player's allow-list. (The plan only asks for "a specific reason", so the order is
+   a choice: the most fundamental blocker is named first, so a locked player is never told their pick is "not in your list".)
+2. **`admin assign`** may give any player (operators themselves included) any difficulty, whatever the global policy,
+   their allow-list or their lock. The result can be a difficulty the player could not choose themselves. Without `lock` an
+   existing lock is left as it is; with `lock` the player is locked on it.
+3. A **locked** player cannot change their own difficulty by any path, including `/execute as` them. Only an administrator
+   (`assign`, `unlock`, `reset`) changes it.
+4. A lock and an allow-list **survive** death, respawn, disconnect, restart and later changes to the server policy. Disabling a
+   difficulty never changes anyone's saved difficulty.
+5. An allow-list is **never empty**. If `restrict` would remove the player's *current* difficulty from the list you must say
+   what happens: `switch` moves them to NORMAL if it is in the list, otherwise to the first listed difficulty in the order
+   normal, easy, hard, elite, peaceful (regardless of how you typed the list); `keep` leaves them where they are as a recorded
+   exception outside the list (once they switch away they cannot switch back). With **neither** flag the command is refused,
+   changes nothing and tells you the options. If the current difficulty is in the list the flag is ignored.
+6. `restrict` and `lock` are **independent**: a locked player with an allow-list stays locked, and the list applies if
+   they are unlocked later. `unlock` and `unrestrict` each undo only their own part.
+7. `admin reset <player>` sets Normal, clears the lock and clears the allow-list (previously: Normal only).
+8. An operator using the ordinary self-service command is an **ordinary player**: they obey their own lock, allow-list
+   and the server policy. Only `admin assign` overrides.
+
+Changing the difficulty of a player who is online uses the same transition handling as choosing it themselves (for example,
+entering Peaceful clears harmful effects). Offline players can be managed too; it applies when they next join. Tab-completion
+offers a player exactly the difficulties they can choose right now (none while locked).
+
+Every `admin` command needs gamemaster (permission level 2) or the console / a command block; a level-1 moderator or an ordinary
+player is refused by the command parser. There is a single permission check for all of them (`PdPermissions.canAdminister`).
+
 ## Configuration
 
 `<server>/config/personaldifficulty.properties` (created with comments on first start). Invalid values (not a number,
@@ -286,20 +324,75 @@ Peaceful deliberately has no settings.
 | Availability policy | `<server>/config/personaldifficulty-availability.json` |
 | Player choices (UUID-keyed) | `<world>/personaldifficulty/players.json` |
 
-Player choices are written only when someone changes their difficulty, atomically, and offline players' entries are
-never removed. Only non-Normal choices are stored (Normal is the default).
+Player records are written only when something changes, atomically (temporary file, flushed to disk, then renamed over the
+old file), and offline players' entries are never removed. A player with nothing to remember (Normal, not locked, no
+allow-list) has no entry. If a write fails the change is refused and reported, never shown as active.
+
+### Format v2 (1.4.0) and migration from 1.0.0 to 1.3.0
+
+```json
+{"version":2,"players":{"<uuid>":{"mode":"ELITE","locked":true,"allowed":["NORMAL","ELITE"],"by":"<admin uuid>","at":1700000000000}}}
+```
+
+Every stored player is an object; `locked`, `allowed`, `by` and `at` appear only when set.
+
+* **Loading never writes.** A v1 file (`"<uuid>":"MODE"`) loads exactly as before and is not rewritten until something changes.
+* **Backup first.** Before the first v2 write over a v1 file, the old file is copied byte for byte to
+  `players.json.backup-<millis>`. If that copy cannot be made, the change is refused and the file is untouched. An
+  already-v2 file needs no further backups.
+* **Nothing unknown is lost.** Unknown fields inside a record, unknown top-level fields and entries whose key is not a UUID are kept
+  verbatim and written back. A stored `INHERIT` (1.0.0) is still read as `NORMAL`.
+* **How a file is judged, in this order:** missing or blank file = empty (a blank file needs no backup); a directory at the path is
+  reported as a directory (nothing is claimed backed up); not valid JSON, not an object, or no `version` = **corrupt**; a
+  **version that is not a whole number of at least 1, or is above 2 = unsupported**; only then is the structure
+  (`players`) checked. The version is judged *before* the structure, so a newer file with a different layout is never mistaken
+  for a corrupt one.
+* **Corrupt or unsupported file: nothing can overwrite it.** It is left byte-identical, a copy is kept as
+  `players.json.backup-<millis>` (an identical earlier copy is reused, so restarts do not pile up copies), and **every change is
+  refused** with the reason (players are told their change was not saved; nothing is reported as applied). Everyone is shown as the default
+  while a corrupt file is not loaded, which is *not* their saved state, so this is reported loudly: an `ERROR` line at startup,
+  a warning in `admin config`, and in the refusal text. Records that can be understood in a *newer-format* file are still applied,
+  read-only (so locks in it keep working). If the backup itself fails the file is still never overwritten.
+* **Recovery without a restart:** fix or replace the file, then run `/personaldifficulty admin reload`. A healthy in-memory state is
+  never replaced by a reload, and a reload that finds the file still bad keeps the current state and keeps refusing writes.
+* **A file changed behind the mod's back** (edited or corrupted while the server runs) is never overwritten either: the next change
+  is refused, a copy is kept, and `admin reload` loads the new content on purpose. A file that was deleted is recreated from memory.
+* **Invalid records are quarantined.** If a stored entry has an *invalid known field* (`mode` not a mode name, `locked` not true/false,
+  `allowed` not a non-empty list of known modes, an unknown mode string, two entries for one player), it is **not** treated as a
+  default player. It is kept verbatim, the player is treated as **locked** (fail closed), the entry's own `mode` is used for
+  gameplay only if that field alone is valid (otherwise Normal), and **no other field of it is trusted**. All changes for that player
+  (self-service, `assign`, `lock`, `unlock`, `restrict`, `unrestrict`) are refused, with the way out named, even for operators.
+  `admin status <player>` shows `INVALID STORED RECORD` with the reason and the raw entry, and `admin config` counts them.
+  `by` and `at` are audit-only: invalid values there are kept but never quarantine a player.
+* **Explicit repair:** `/personaldifficulty admin reset <player>` on a quarantined player first makes a **new, byte-for-byte verified**
+  backup of the file, then replaces the entry with a default record (Normal, unlocked, no allow-list) that keeps the entry's
+  *unknown* fields. The invalid values themselves stay in the backup. If the backup or the write fails, nothing changes.
+* **Downgrading to 1.3.0 or earlier is not safe once a v2 file has been written.** Those versions only understand
+  `"<uuid>":"MODE"` strings, but **every** player in a v2 file is an object. Verified by running the real 1.3.0 reader on v2 files: it reads
+  **every** player in the file as **Normal and unlocked**, including players whose stored mode was Hard, Easy, Elite or Peaceful (not only
+  locked or restricted ones), because it does not recognise any object record. It logs a "newer format" warning and copies the file, but
+  keeps running. The next time 1.3.0 saves anything it rewrites the file with a **`"version":1` header while keeping the v2 objects
+  verbatim**, and stores new choices as plain strings, so the file ends up mixed. (1.4.0 reads such a mixed file correctly, with
+  locks and allow-lists intact.) To go back safely, **stop the server and restore the `players.json.backup-<millis>` made before
+  the first v2 write**; every change made since then is lost.
 
 ### Migration from 1.0.0
+
+* `EASY`, `HARD` (and `NORMAL`) are read as before; a stored `INHERIT` is read as `NORMAL`. This happens on every load, so
+  it is idempotent, survives restarts and does not require anyone to join.
+* The file is first rewritten the next time any record changes; that write omits the retired `INHERIT`/`NORMAL` values.
+* `/personaldifficulty admin reset` meant "back to Normal" since 1.1.0; since 1.4.0 it also clears the lock and allow-list.
 
 The `players.json` format did not change, so there is **no rewrite on upgrade**:
 
 * `EASY`, `HARD` (and `NORMAL`) are read as before; a stored `INHERIT` is read as `NORMAL`. This happens on every load, so
   it is idempotent, survives restarts and does not require anyone to join.
 * The file is first rewritten the next time any selection changes; that write omits the retired `INHERIT`/`NORMAL` values.
-* Entries this version cannot understand (an unknown mode, a malformed UUID key) are **kept verbatim** and written back,
-  never dropped. A completely unreadable or newer-format file is copied to `players.json.backup-<time>` before anything
-  else happens. Downgrading to 1.0.0 stays possible (it reads the same format).
-* `/personaldifficulty admin reset` now means "back to Normal".
+* Entries this version cannot understand are never dropped: an entry with a malformed UUID key is kept verbatim, and an entry for a
+  real player with an unknown mode or invalid field is quarantined (see above). Files written by 1.0.0 to 1.3.0 are v1 files:
+  1.4.0 reads them unchanged and migrates them on the first change, after a backup. (Going back from v2 to those versions is
+  covered above: restore the backup.)
+* `/personaldifficulty admin reset` meant "back to Normal" since 1.1.0; since 1.4.0 it also clears the lock and allow-list.
 
 ## Limitations
 

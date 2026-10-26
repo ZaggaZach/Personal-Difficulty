@@ -442,7 +442,7 @@ no bundled Loader/Fabric API/Gson. The mod source contains no call that sets the
 2. Elite's difficulty is a design estimate; expect to tune `elite.*` after play.
 3. Peaceful attribution is best-effort (README "Limitations"): unattributable harm to *non-Peaceful* victims is not blocked.
 4. Peaceful forbids harmful effects from any source, including `/effect` by operators.
-5. A corrupt `players.json` leaves players on Normal until an operator restores the `*.backup-*` copy.
+5. A corrupt `players.json` leaves players shown as Normal and (since 1.4.0) refuses every change until the file is fixed and `admin reload` is run; the original and a backup are kept (see README "Format v2").
 
 ## 9. Checklist for your own real-client test (Modrinth-managed Fabric 26.3 server)
 

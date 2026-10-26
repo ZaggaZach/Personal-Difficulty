@@ -106,8 +106,9 @@ permission-gated `admin` literal is enforced by the parser, so it cannot be bypa
 
 ## Player data and migration
 
-See README "Migration from 1.0.0". The format is unchanged, so migration is a tolerant read, not a rewrite. Unknown entries
-are kept verbatim; unreadable files are copied to `*.backup-<time>` before anything is overwritten.
+See README "Format v2 (1.4.0) and migration". Since 1.4.0 the format is v2 (object records); v1 files are read unchanged and migrated on
+the first change after a verified backup. Unknown data is kept verbatim, unreadable entries are quarantined (fail closed), and corrupt,
+unsupported or externally changed files are never overwritten (every change is refused until the file is fixed and `admin reload` is run).
 
 ## State and failure behaviour
 

@@ -3,6 +3,14 @@
 Added in the 1.4.0 development line (Phase 0). Ported from the Gift Mailbox project's test harness and trimmed to what Personal
 Difficulty needs: `ServerRunner`, `Bot`, `E2e` and the smoke test, plus a test-only fixture mod.
 
+## Tests
+* `SmokeE2eTest`: join, run the mod command, open and use the fixture menu, hostile clicks (Phase 0).
+* `PlayerPolicyE2eTest` (Phase 1): lock, allow-list and assigned mode survive a graceful restart and a `ServerRunner.kill()`
+  (SIGKILL); a rapid write burst killed mid-stream never leaves a corrupt `players.json` (3 rounds); a v1 file loads without
+  being rewritten, then migrates with a byte-identical backup on the first change; a newer-format file is read but never overwritten.
+  A corrupt file at startup is visible to administrators, never overwritten, and `admin reload` recovers it without a restart; an invalid
+  stored record is quarantined across restarts until `admin reset` repairs it with a verified backup.
+
 ## What it is
 `./gradlew e2eTest` starts a REAL Fabric dedicated server process (installed with the official Fabric installer) with three mods in
 `mods/`: Fabric API, **the built Personal Difficulty jar** (`build/libs`), and a tiny test-only fixture mod
