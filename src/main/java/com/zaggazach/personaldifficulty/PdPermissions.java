@@ -15,6 +15,16 @@ import net.minecraft.server.permissions.PermissionSet;
  * so /op and /deop take effect at once. Console and command blocks carry their own permission sets.
  */
 public final class PdPermissions {
+	/**
+	 * Permission-node ids RESERVED for a later release (plan section 5, C4). They are constants only: nothing looks them up and the
+	 * single rule remains "gamemaster (level 2) or above". Reserving the exact strings now keeps them stable for server owners who
+	 * will want to grant them with a permissions mod later.
+	 */
+	public static final String NODE_ADMIN_GUI = "personaldifficulty.admin.gui";
+	public static final String NODE_ADMIN_ASSIGN = "personaldifficulty.admin.assign";
+	public static final String NODE_ADMIN_LOCK = "personaldifficulty.admin.lock";
+	public static final String NODE_ADMIN_CONFIG = "personaldifficulty.admin.config";
+
 	private PdPermissions() {
 	}
 

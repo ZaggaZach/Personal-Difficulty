@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (1.4.0 in progress, Phase 1: per-player control)
+## Unreleased (1.4.0 in progress, Phase 3: admin menu; Phase 2: settings overrides; Phase 1: per-player control)
 
 Not released; the mod version is unchanged. Elite behaviour is unchanged.
 
@@ -19,6 +19,26 @@ Not released; the mod version is unchanged. Elite behaviour is unchanged.
 * Administrative mode changes to an online player (assign, reset, `restrict ... switch`) now run the same transition hook as
   self-selection (entering Peaceful clears harmful effects). Offline players need no hook.
 * Tab-completion offers a player exactly what they can choose now (none while locked).
+
+### Added (Phase 3: the admin menu)
+* **`/personaldifficulty admin gui`**: an operator-only chest menu with **Player Management** (browse online and offline players, assign, lock,
+  unlock, restrict, unrestrict, reset, and the explicit repair of an invalid stored record) and **Difficulty Permissions** (server-wide
+  enable/disable, the per-player allow-list editor with the Switch / Keep / Cancel confirmation). No client mod is needed.
+* **Shared administrative service (`AdminService`)**: the logic of the `admin assign/lock/unlock/restrict/unrestrict/reset/status/enable/disable`
+  commands moved out of `PdCommands` unchanged; the commands and the menu both call it, so they cannot drift apart. A golden transcript
+  GameTest recorded from the previous code pins every command's wording, order and outcome.
+* **`AdminActor`** (server-established identity and live authority; not related to `SelectionPolicy.Actor`). The service checks the live
+  permission before it reads or changes anything, in addition to the command parser, the menu's `stillValid` and the click handler.
+* **Click kinds**: the menu framework now classifies every click (`ClickKind`) and forwards only plain left/right presses on menu slots.
+  Change: **shift-click on a menu button no longer acts as a press** (it used to in the Phase 0 base class); it is rejected like every other
+  unsupported kind. Nothing shipped used it.
+* **Offline player discovery (`PlayerDirectory`)** merges players with stored records, online players and `usercache.json`; read-only,
+  deduplicated, sorted, and tolerant of a missing or damaged user cache.
+* **Reserved permission-node ids** in `PdPermissions` (`personaldifficulty.admin.gui`, `.assign`, `.lock`, `.config`): constants only, nothing looks
+  them up and the rule is still "gamemaster (level 2) or above".
+* Menu hardening: `PdAdminMenu.stillValid` is final (no page can weaken the validity check), an `AdminActor` can only be built by the server-side
+  factories (identity and authority cannot be injected), and `admin enable/disable` report failure for a refusal or a lost authority.
+* `PlayerSettings.knownIds()` (read-only) lists the UUIDs of valid and invalid stored records.
 
 ### Added (Phase 2: settings you can change with commands)
 * **`SettingRegistry`**: the single table of every configurable setting (key, type, bounds, default, step, display text, apply timing),

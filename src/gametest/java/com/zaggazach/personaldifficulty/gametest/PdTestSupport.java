@@ -108,6 +108,18 @@ public final class PdTestSupport {
 		return p;
 	}
 
+	/**
+	 * Removes a mock player from the server again (disconnect path: events fire, menus are aborted), so tests that create many
+	 * players do not leave them standing in the shared world for the mob-AI tests that run later.
+	 */
+	public static void leave(ServerPlayer p) {
+		try {
+			p.level().getServer().getPlayerList().remove(p);
+		} catch (RuntimeException e) {
+			p.discard();
+		}
+	}
+
 	public static void setMode(ServerPlayer p, PersonalDifficultyMode mode) {
 		try {
 			rt().settings().set(p.getUUID(), mode);

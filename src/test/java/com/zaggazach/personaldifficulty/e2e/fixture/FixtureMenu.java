@@ -31,7 +31,7 @@ final class FixtureMenu extends PdDisplayMenu {
 	}
 
 	@Override
-	protected void onPress(int slot) {
+	protected void onPress(int slot, com.zaggazach.personaldifficulty.ui.ClickKind kind) {
 		if (slot == 0) {
 			player.sendSystemMessage(Component.literal("fixture: pressed slot 0"));
 		} else if (slot == 8) {

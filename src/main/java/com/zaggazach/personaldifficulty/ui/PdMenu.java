@@ -49,11 +49,6 @@ public abstract class PdMenu extends AbstractContainerMenu {
 		player.openMenu(new SimpleMenuProvider(constructor, title));
 	}
 
-	/** Called when the player is disconnecting while this menu is open (vanilla does not close it first). */
-	public void abort() {
-		closed = true;
-	}
-
 	@Override
 	public boolean stillValid(Player p) {
 		return !closed && p == player && !player.hasDisconnected();

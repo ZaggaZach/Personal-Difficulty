@@ -453,7 +453,7 @@ public class PdGameTests {
 		check(forPlayer.equals(List.of("difficulty", "status")), "player-visible nodes: " + forPlayer);
 		check(forOp.equals(List.of("admin", "difficulty", "status")), "op-visible nodes: " + forOp);
 		List<String> adminChildren = root.getChild("admin").getChildren().stream().map(CommandNode::getName).sorted().toList();
-		check(adminChildren.equals(List.of("assign", "config", "difficulties", "disable", "enable", "get", "lock", "reload", "reset", "restrict", "set", "status", "unlock", "unrestrict", "unset")), "admin subcommands (1.4.0 adds assign, lock, unlock, restrict, unrestrict, get, set, unset): " + adminChildren);
+		check(adminChildren.equals(List.of("assign", "config", "difficulties", "disable", "enable", "get", "gui", "lock", "reload", "reset", "restrict", "set", "status", "unlock", "unrestrict", "unset")), "admin subcommands (1.4.0 adds assign, lock, unlock, restrict, unrestrict, get, set, unset, gui): " + adminChildren);
 
 		var suggestions = dispatcher.getCompletionSuggestions(dispatcher.parse("personaldifficulty ", plain)).get();
 		List<String> offered = suggestions.getList().stream().map(s -> s.getText()).sorted().toList();

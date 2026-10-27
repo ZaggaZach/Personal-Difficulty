@@ -62,6 +62,7 @@ error and changes nothing. Choosing the one you already have says "nothing chang
 | `/personaldifficulty admin restrict <player> <d1>[,<d2>...] [switch\|keep]` | Limit the player to an allow-list of difficulties (see below) |
 | `/personaldifficulty admin unrestrict <player>` | Remove the player's allow-list (a lock is left alone) |
 | `/personaldifficulty admin reset <player>` | Mode **Normal**, lock cleared **and** allow-list cleared. On a player whose stored record is invalid it is the explicit repair (verified backup first) |
+| `/personaldifficulty admin gui` | Open the **admin menu** (Player Management and Difficulty Permissions; players only, see "The admin menu" below) |
 | `/personaldifficulty admin config [prefix]` | The server overview, then every effective setting with its **source** (default, properties, override); `config elite.` shows only keys starting with `elite.` |
 | `/personaldifficulty admin get <key>` | One setting: value and source, the value without the override, default, allowed range and when a change applies |
 | `/personaldifficulty admin set <key> <value>` | Change a setting at runtime without editing files (strictly validated; stored as an override) |
@@ -216,6 +217,30 @@ abilities, attributes or any game rule:
 * Death, respawn and reconnect keep your choice.
 
 Known limits are listed under [Limitations](#limitations).
+
+## The admin menu (1.4.0)
+
+`/personaldifficulty admin gui` opens a chest-style menu for operators (permission level 2). It is a server-side screen that uses the
+vanilla chest menu type, so **nothing needs to be installed on the client**. It does the same things as the `admin` commands above and
+nothing else: every change goes through the same code as the matching command, so the rules, the refusals, the wording of the result, the
+server-console audit line and the broadcast to other operators are identical (and sent once). The menu shows the last result on its status
+card.
+
+* **Player Management:** a paged list of everyone the server knows: players with a stored record, players online now, and every entry of
+  `usercache.json`, each once, sorted by name. Pick a player to see their status and to assign any difficulty (or assign and lock), lock or
+  unlock, edit or remove their allow-list, or reset them. Listing or opening a player never creates a stored record; a player without one
+  simply shows the defaults. If `usercache.json` is missing or damaged, the list is built from the other sources.
+* **Difficulty Permissions:** enable or disable each difficulty server-wide (never the last one), "enable all", and the per-player
+  allow-list editor. Applying an allow-list that excludes the player's current difficulty asks **Switch**, **Keep** or **Cancel**, with the
+  same meaning as `restrict ... switch|keep`; the player's record and your authority are re-checked when you confirm.
+* **Invalid stored records** are shown as invalid. Only the explicit **Repair invalid record** button is offered (it is `admin reset`: a
+  verified backup is made first, unknown fields are kept); nothing else can touch the record.
+* **Security.** Permission is checked when the menu opens, continuously while it is open (an operator who is demoted while a menu is open
+  has the screen closed by the server on its next tick), at the start of every click, and again inside the service that performs the
+  change. The client only ever sends a slot number and a click type; the page, the selected player and any pending choice live on the server.
+  Only a plain left or right click on a menu slot does anything: shift-click, number keys, drag, double-click, drop, creative clone, clicks
+  outside the menu and clicks for a stale or unknown container are ignored without side effects. Hidden buttons are never relied on.
+* Not in this release: the settings pages (they arrive later). Use `admin get/set/unset` for settings.
 
 ## Server restrictions
 

@@ -1,0 +1,257 @@
+> status pd_gold_a
+  result=1 error=null
+  | pd_gold_a (00000000-0000-0000-0000-0000000000a1): NORMAL
+  |   locked: no
+  |   allow-list: none (follows the server policy)
+> assign pd_gold_a hard
+  result=1 error=null
+  | pd_gold_a is now HARD.
+> assign pd_gold_a hard
+  result=0 error=null
+  | pd_gold_a is already HARD; nothing changed.
+> assign pd_gold_a elite lock
+  result=1 error=null
+  | pd_gold_a is now ELITE. Locked: only an administrator can change it.
+> status pd_gold_a
+  result=1 error=null
+  | pd_gold_a (00000000-0000-0000-0000-0000000000a1): ELITE
+  |   locked: YES (players cannot change it themselves)
+  |   allow-list: none (follows the server policy)
+  |   last administrative change: console/command block at <time>
+> lock pd_gold_a
+  result=0 error=null
+  | pd_gold_a is already locked; nothing changed.
+> unlock pd_gold_a
+  result=1 error=null
+  | pd_gold_a is unlocked; they can choose again.
+> unlock pd_gold_a
+  result=0 error=null
+  | pd_gold_a is already unlocked; nothing changed.
+> lock pd_gold_a
+  result=1 error=null
+  | pd_gold_a is now locked on ELITE; only an administrator can change it.
+> assign pd_gold_a normal
+  result=1 error=null
+  | pd_gold_a is now NORMAL. Locked: only an administrator can change it. (an administrator override: the player could not have chosen this themselves)
+> unlock pd_gold_a
+  result=1 error=null
+  | pd_gold_a is unlocked; they can choose again.
+> assign pd_gold_a peaceful
+  result=1 error=null
+  | pd_gold_a is now PEACEFUL.
+> assign pd_gold_a bogus
+  result=0 error=null
+  | Unknown difficulty 'bogus'. Known: normal, easy, hard, elite, peaceful.
+> assign pd_gold_a Hard
+  result=1 error=null
+  | pd_gold_a is now HARD.
+> status pd_gold_a
+  result=1 error=null
+  | pd_gold_a (00000000-0000-0000-0000-0000000000a1): HARD
+  |   locked: no
+  |   allow-list: none (follows the server policy)
+  |   last administrative change: console/command block at <time>
+> [op] assign pd_gold_b easy lock
+  result=1 error=null
+  | pd_gold_b is now EASY. Locked: only an administrator can change it.
+> status pd_gold_b
+  result=1 error=null
+  | pd_gold_b (00000000-0000-0000-0000-0000000000b2): EASY
+  |   locked: YES (players cannot change it themselves)
+  |   allow-list: none (follows the server policy)
+  |   last administrative change: 00000000-0000-0000-0000-0000000000e5 at <time>
+> restrict pd_gold_a normal,easy
+  result=0 error=null
+  | Refused: pd_gold_a is on HARD, which is not in the new list (normal, easy). Nothing changed. Re-run with 'switch' (moves them to NORMAL) or 'keep' (they stay on HARD as an exception outside the list).
+> restrict pd_gold_a normal,easy switch
+  result=1 error=null
+  | pd_gold_a is now restricted to normal, easy. They were moved to NORMAL.
+> status pd_gold_a
+  result=1 error=null
+  | pd_gold_a (00000000-0000-0000-0000-0000000000a1): NORMAL
+  |   locked: no
+  |   allow-list: normal, easy
+  |   last administrative change: console/command block at <time>
+> restrict pd_gold_a normal,easy
+  result=0 error=null
+  | pd_gold_a is already restricted to normal, easy; nothing changed.
+> restrict pd_gold_c hard,elite keep
+  result=1 error=null
+  | pd_gold_c is now restricted to hard, elite. They stay on NORMAL as an exception outside the list; once they switch away they cannot switch back.
+> status pd_gold_c
+  result=1 error=null
+  | pd_gold_c (00000000-0000-0000-0000-0000000000c3): NORMAL
+  |   locked: no
+  |   allow-list: hard, elite (current mode NORMAL is outside it: kept as an exception)
+  |   last administrative change: console/command block at <time>
+> restrict pd_gold_c hard,elite
+  result=0 error=null
+  | Refused: pd_gold_c is on NORMAL, which is not in the new list (hard, elite). Nothing changed. Re-run with 'switch' (moves them to HARD) or 'keep' (they stay on NORMAL as an exception outside the list).
+> restrict pd_gold_c hard
+  result=0 error=null
+  | Refused: pd_gold_c is on NORMAL, which is not in the new list (hard). Nothing changed. Re-run with 'switch' (moves them to HARD) or 'keep' (they stay on NORMAL as an exception outside the list).
+> restrict pd_gold_c hard,bogus
+  result=0 error=null
+  | Unknown difficulty 'bogus'. Known: normal, easy, hard, elite, peaceful.
+> restrict pd_gold_c ,
+  result=0 error=null
+  | An allow-list cannot be empty. Use 'admin unrestrict <player>' to remove a restriction.
+> restrict pd_gold_c hard switch extra
+  result=0 error=null
+  | Usage: admin restrict <player> <mode>[,<mode>...] [switch|keep] (no spaces inside the list).
+> restrict pd_gold_c hard nonsense
+  result=0 error=null
+  | Unknown option 'nonsense'; expected 'switch' or 'keep' (and no spaces inside the mode list).
+> restrict pd_gold_c elite,hard,hard
+  result=0 error=null
+  | Refused: pd_gold_c is on NORMAL, which is not in the new list (hard, elite). Nothing changed. Re-run with 'switch' (moves them to HARD) or 'keep' (they stay on NORMAL as an exception outside the list).
+> unrestrict pd_gold_c
+  result=1 error=null
+  | pd_gold_c is no longer restricted to an allow-list; the server policy applies again.
+> unrestrict pd_gold_c
+  result=0 error=null
+  | pd_gold_c has no allow-list; nothing changed.
+> status pd_gold_c
+  result=1 error=null
+  | pd_gold_c (00000000-0000-0000-0000-0000000000c3): NORMAL
+  |   locked: no
+  |   allow-list: none (follows the server policy)
+> restrict pd_gold_a hard,elite keep
+  result=1 error=null
+  | pd_gold_a is now restricted to hard, elite. They stay on NORMAL as an exception outside the list; once they switch away they cannot switch back.
+> unrestrict pd_gold_a
+  result=1 error=null
+  | pd_gold_a is no longer restricted to an allow-list; the server policy applies again.
+> status pd_gold_a
+  result=1 error=null
+  | pd_gold_a (00000000-0000-0000-0000-0000000000a1): NORMAL
+  |   locked: no
+  |   allow-list: none (follows the server policy)
+> reset pd_gold_d
+  result=0 error=null
+  | pd_gold_d (00000000-0000-0000-0000-0000000000d4) has no stored selection, lock or allow-list; already NORMAL. Nothing changed.
+> assign pd_gold_d hard lock
+  result=1 error=null
+  | pd_gold_d is now HARD. Locked: only an administrator can change it.
+> restrict pd_gold_d hard,elite
+  result=1 error=null
+  | pd_gold_d is now restricted to hard, elite. They are still locked.
+> reset pd_gold_d
+  result=1 error=null
+  | pd_gold_d reset to NORMAL (was HARD, lock cleared, allow-list cleared).
+> reset pd_gold_d
+  result=0 error=null
+  | pd_gold_d (00000000-0000-0000-0000-0000000000d4) has no stored selection, lock or allow-list; already NORMAL. Nothing changed.
+> status pd_gold_d
+  result=1 error=null
+  | pd_gold_d (00000000-0000-0000-0000-0000000000d4): NORMAL
+  |   locked: no
+  |   allow-list: none (follows the server policy)
+> difficulties
+  result=1 error=null
+  | Difficulty availability (a restriction only blocks NEW selections; saved selections are never changed):
+  |   normal: ENABLED
+  |   easy: ENABLED
+  |   hard: ENABLED
+  |   elite: ENABLED
+  |   peaceful: ENABLED
+  | Players can select: normal, easy, hard, elite, peaceful
+> disable hard
+  result=1 error=null
+  | HARD is now DISABLED. Players cannot newly select it; the <n> saved selection(s) using it are kept, and those players keep playing on it until they switch away.
+> disable hard
+  result=1 error=null
+  | HARD is already disabled; nothing changed.
+> difficulties
+  result=1 error=null
+  | Difficulty availability (a restriction only blocks NEW selections; saved selections are never changed):
+  |   normal: ENABLED
+  |   easy: ENABLED
+  |   hard: DISABLED (<n> player(s) still use it; kept)
+  |   elite: ENABLED
+  |   peaceful: ENABLED
+  | Players can select: normal, easy, elite, peaceful
+> disable easy
+  result=1 error=null
+  | EASY is now DISABLED. Players cannot newly select it; the <n> saved selection(s) using it are kept, and those players keep playing on it until they switch away.
+> disable elite
+  result=1 error=null
+  | ELITE is now DISABLED. Players cannot newly select it; the <n> saved selection(s) using it are kept, and those players keep playing on it until they switch away.
+> disable peaceful
+  result=1 error=null
+  | PEACEFUL is now DISABLED. Players cannot newly select it; the <n> saved selection(s) using it are kept, and those players keep playing on it until they switch away.
+> disable normal
+  result=0 error=null
+  | Refused: NORMAL is the last enabled difficulty, and at least one must stay selectable. Nothing changed.
+> difficulties
+  result=1 error=null
+  | Difficulty availability (a restriction only blocks NEW selections; saved selections are never changed):
+  |   normal: ENABLED
+  |   easy: DISABLED (<n> player(s) still use it; kept)
+  |   hard: DISABLED (<n> player(s) still use it; kept)
+  |   elite: DISABLED (<n> player(s) still use it; kept)
+  |   peaceful: DISABLED (<n> player(s) still use it; kept)
+  | Players can select: normal
+> enable hard
+  result=1 error=null
+  | HARD is now ENABLED. It can be selected again now (no restart needed).
+> enable hard
+  result=1 error=null
+  | HARD is already enabled; nothing changed.
+> enable bogus
+  result=0 error=null
+  | Unknown difficulty 'bogus'. Known: normal, easy, hard, elite, peaceful, all.
+> disable bogus
+  result=0 error=null
+  | Unknown difficulty 'bogus'. Known: normal, easy, hard, elite, peaceful.
+> enable all
+  result=1 error=null
+  | All difficulties are enabled again. Players can select: normal, easy, hard, elite, peaceful.
+> enable all
+  result=1 error=null
+  | Every difficulty is already enabled; nothing changed.
+> difficulties
+  result=1 error=null
+  | Difficulty availability (a restriction only blocks NEW selections; saved selections are never changed):
+  |   normal: ENABLED
+  |   easy: ENABLED
+  |   hard: ENABLED
+  |   elite: ENABLED
+  |   peaceful: ENABLED
+  | Players can select: normal, easy, hard, elite, peaceful
+> status pd_gold_c
+  result=1 error=null
+  | pd_gold_c (00000000-0000-0000-0000-0000000000c3): INVALID STORED RECORD, kept verbatim in players.json and NOT trusted
+  |   reason: "locked" is not true or false ("yes")
+  |   stored: "00000000-0000-0000-0000-0000000000c3":{"mode":"ELITE","locked":"yes","nickname":"zed"}
+  |   in force: treated as LOCKED on ELITE (the mode is used only if the stored mode field alone was valid); no allow-list
+  |   every change for this player is refused until you run '/personaldifficulty admin reset pd_gold_c' (a verified backup is made first; unknown fields are kept)
+> assign pd_gold_c normal
+  result=0 error=null
+  | Refused: pd_gold_c has an invalid stored record ("locked" is not true or false ("yes")), which is kept untouched. Nothing changed. Repair it first with '/personaldifficulty admin reset pd_gold_c' (a verified backup is made first).
+> lock pd_gold_c
+  result=0 error=null
+  | Refused: pd_gold_c has an invalid stored record ("locked" is not true or false ("yes")), which is kept untouched. Nothing changed. Repair it first with '/personaldifficulty admin reset pd_gold_c' (a verified backup is made first).
+> unlock pd_gold_c
+  result=0 error=null
+  | Refused: pd_gold_c has an invalid stored record ("locked" is not true or false ("yes")), which is kept untouched. Nothing changed. Repair it first with '/personaldifficulty admin reset pd_gold_c' (a verified backup is made first).
+> restrict pd_gold_c easy
+  result=0 error=null
+  | Refused: pd_gold_c has an invalid stored record ("locked" is not true or false ("yes")), which is kept untouched. Nothing changed. Repair it first with '/personaldifficulty admin reset pd_gold_c' (a verified backup is made first).
+> restrict pd_gold_c easy keep
+  result=0 error=null
+  | Refused: pd_gold_c has an invalid stored record ("locked" is not true or false ("yes")), which is kept untouched. Nothing changed. Repair it first with '/personaldifficulty admin reset pd_gold_c' (a verified backup is made first).
+> unrestrict pd_gold_c
+  result=0 error=null
+  | Refused: pd_gold_c has an invalid stored record ("locked" is not true or false ("yes")), which is kept untouched. Nothing changed. Repair it first with '/personaldifficulty admin reset pd_gold_c' (a verified backup is made first).
+> reset pd_gold_c
+  result=1 error=null
+  | pd_gold_c: the invalid stored record was replaced by a default one (NORMAL, unlocked, no allow-list). The old entry, including its invalid values, is in the verified backup: players.json.backup-<ms>. Unknown fields kept: [nickname].
+> reset pd_gold_c
+  result=1 error=null
+  | pd_gold_c reset to NORMAL (was NORMAL).
+> status pd_gold_c
+  result=1 error=null
+  | pd_gold_c (00000000-0000-0000-0000-0000000000c3): NORMAL
+  |   locked: no
+  |   allow-list: none (follows the server policy)

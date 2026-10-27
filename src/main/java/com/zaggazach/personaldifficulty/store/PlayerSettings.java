@@ -314,6 +314,13 @@ public final class PlayerSettings {
 		return new Repair(backup, List.copyOf(kept));
 	}
 
+	/** Every player UUID this store knows about (valid records and quarantined entries). A snapshot; reading it changes nothing. */
+	public java.util.Set<UUID> knownIds() {
+		java.util.Set<UUID> ids = new java.util.HashSet<>(records.keySet());
+		ids.addAll(quarantine.keySet());
+		return ids;
+	}
+
 	public boolean hasExplicit(UUID id) {
 		return records.containsKey(id);
 	}

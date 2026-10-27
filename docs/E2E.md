@@ -14,6 +14,13 @@ Difficulty needs: `ServerRunner`, `Bot`, `E2e` and the smoke test, plus a test-o
   corrupt overrides file or loses an unrelated override, `personaldifficulty.properties` stays byte-identical, a corrupt overrides file at startup is
   loud (ERROR line, logged once), never overwritten and recoverable with `admin reload`, and invalid or unknown entries are preserved, reported once and
   replaceable by an explicit valid `set` after a verified backup.
+* `AdminGuiE2eTest` (Phase 3): a non-operator cannot open `admin gui`; an operator gets an ordinary vanilla 9x6 chest screen and can assign and
+  lock a player through it with exactly one audit line per change; a demoted operator's screen is closed by the server and stale clicks for it are
+  ignored; the changes survive a graceful restart and, after an abrupt client drop with the menu open, a `kill -9`; more than 2,000 hostile and
+  malformed packets per screen (every click type on every slot including out-of-range ones, stale and nonsense container ids, junk changed-slot maps,
+  menu-button and creative-slot packets) change nothing, do not drop the client and do not flood the log; offline players from `players.json` and
+  `usercache.json` are listed, a missing or non-JSON user cache is harmless, and viewing a player creates no record; an invalid stored record is shown as
+  invalid and only the explicit repair (with a verified backup) changes it.
 
 ## What it is
 `./gradlew e2eTest` starts a REAL Fabric dedicated server process (installed with the official Fabric installer) with three mods in

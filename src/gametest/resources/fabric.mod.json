@@ -18,7 +18,9 @@
 			"com.zaggazach.personaldifficulty.gametest.EliteEffectsGameTests",
 			"com.zaggazach.personaldifficulty.gametest.Phase0PermissionProbeGameTests",
 			"com.zaggazach.personaldifficulty.gametest.PlayerPolicyGameTests",
-			"com.zaggazach.personaldifficulty.gametest.ConfigCommandGameTests"
+			"com.zaggazach.personaldifficulty.gametest.ConfigCommandGameTests",
+				"com.zaggazach.personaldifficulty.gametest.AdminTranscriptGameTests",
+				"com.zaggazach.personaldifficulty.gametest.AdminMenuGameTests"
 		]
 	},
 	"depends": {
