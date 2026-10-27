@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased (1.4.0 in progress, Phase 3: admin menu; Phase 2: settings overrides; Phase 1: per-player control)
+## 1.3.1-rc.1: UNPUBLISHED release candidate (Phases 1-3 of the 1.4.0 line: per-player control, settings overrides, admin menu)
 
-Not released; the mod version is unchanged. Elite behaviour is unchanged.
+> **Status: a private, local checkpoint. NOT published, NOT a stable release.** The admin menu has **NOT been tested in a graphical
+> client**; it is verified only by unit tests, in-server GameTests and a headless protocol client against a real server. The version
+> `1.3.1-rc.1` is provisional and may be renamed before any release. The released `1.3.0` (tag `v1.3.0`) is untouched. Elite behaviour is unchanged.
 
 ### Added
 * **Per-player lock, allow-list and administrator assignment** with eight explicit rules (README, "Per-player control"):
