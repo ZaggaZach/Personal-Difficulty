@@ -6,13 +6,17 @@ import java.util.Optional;
 /**
  * A player's personal difficulty. {@link #NORMAL} is the default for everyone who has never chosen:
  * since 1.1.0 there is no separate "inherit" state.
+ *
+ * <p>Declaration order is the display order everywhere (menus, command suggestions, messages), from easiest to hardest:
+ * PEACEFUL, EASY, NORMAL, HARD, ELITE (since 1.3.1). Stored data uses names, never ordinals, so reordering is safe; nothing may
+ * depend on the ordinal.
  */
 public enum PersonalDifficultyMode {
-	NORMAL,
+	PEACEFUL,
 	EASY,
+	NORMAL,
 	HARD,
-	ELITE,
-	PEACEFUL;
+	ELITE;
 
 	public static final PersonalDifficultyMode DEFAULT = NORMAL;
 

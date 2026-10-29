@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.3.1-rc.2: UNPUBLISHED release candidate (admin menu redesign after the first graphical-client test)
+
+> **Status: a private checkpoint, NOT published.** Built from `1.3.1-rc.1` (commit `5d40840`) after testing that RC's admin menu in a
+> real client. `rc.1` and its tag are untouched.
+
+### Changed
+* **Difficulty order is now Peaceful, Easy, Normal, Hard, Elite everywhere**: menus, command suggestions, "Known: ..." lists and
+  status messages. Stored data uses names, so existing files are unaffected. `restrict ... switch` still prefers Normal, then Easy,
+  Hard, Elite and Peaceful last (it no longer follows the declaration order, so the reorder cannot send anyone to Peaceful).
+* **Admin menu redesigned** for clarity:
+  * the main menu has two choices, **Players** and **Server Difficulties**;
+  * players are shown as their **player heads**, with difficulty, online status, lock and allow-list in the tooltip;
+  * one **player page** holds everything for that player: *Set difficulty* (the current one glows), *Allowed difficulties*
+    (tick/untick, then *Save*, which glows when there are unsaved changes), a **Lock: ON/OFF** toggle, **Allow all**, and **Reset**
+    (now asks to confirm). The separate "Assign ... and lock" row and the second route to the allow-list editor are gone;
+  * **Server Difficulties** shows each difficulty as ON/OFF (glowing when on) plus *Turn all on*;
+  * difficulty icons rise in toughness: poppy, wooden, iron, diamond and netherite sword (weapon stats hidden);
+  * unused slots are **empty** instead of grey glass panes (all slots stay locked; shift-click and drags still do nothing);
+  * the **same navigation bar on every page**: Back bottom-left, Close bottom-middle, page arrows bottom-right (shown only when
+    there is another page).
+* The empty allow-list message in the menu now points to the *Allow all* button instead of a command.
+
+### Known gaps
+* `AdminMenuGameTests`, the admin transcript golden file and `AdminGuiE2eTest` still describe the rc.1 slot layout and must be
+  updated before they are run again (they are not part of `./gradlew build`).
+
 ## 1.3.1-rc.1: UNPUBLISHED release candidate (Phases 1-3 of the 1.4.0 line: per-player control, settings overrides, admin menu)
 
 > **Status: a private, local checkpoint. NOT published, NOT a stable release.** The admin menu has **NOT been tested in a graphical

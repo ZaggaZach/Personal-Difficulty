@@ -12,7 +12,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.ItemLore;
+import net.minecraft.world.item.component.ResolvableProfile;
 import net.minecraft.world.item.component.TooltipDisplay;
+import com.mojang.authlib.GameProfile;
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Builders for the control and decoration items shown in menus. Every one carries a marker so that, as a belt-and-braces
@@ -45,7 +49,28 @@ public final class UiItems {
 		if (!lore.isEmpty()) {
 			stack.set(DataComponents.LORE, new ItemLore(lore));
 		}
+		// swords and tools would otherwise list their attack damage/speed under the button's text
+		stack.remove(DataComponents.ATTRIBUTE_MODIFIERS);
 		return mark(stack);
+	}
+
+	/** As {@link #button} but glowing (enchantment glint) when {@code on}: how menus show "selected" or "enabled". */
+	public static ItemStack button(Item item, Component name, List<Component> lore, boolean on) {
+		ItemStack stack = button(item, name, lore);
+		if (on) {
+			stack.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
+		}
+		return stack;
+	}
+
+	/**
+	 * A player head showing {@code id}'s skin. An online player's full profile (with skin textures) is used when given; otherwise the
+	 * profile is left for the client to resolve from the UUID. Either way only the visual is affected: clicks are routed by slot.
+	 */
+	public static ItemStack head(UUID id, @Nullable GameProfile onlineProfile, Component name, List<Component> lore) {
+		ItemStack stack = button(Items.PLAYER_HEAD, name, lore);
+		stack.set(DataComponents.PROFILE, onlineProfile != null ? ResolvableProfile.createResolved(onlineProfile) : ResolvableProfile.createUnresolved(id));
+		return stack;
 	}
 
 	public static ItemStack filler() {

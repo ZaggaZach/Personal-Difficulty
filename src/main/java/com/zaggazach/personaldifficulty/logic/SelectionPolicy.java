@@ -120,14 +120,19 @@ public final class SelectionPolicy {
 	}
 
 	/**
-	 * The mode {@code restrict ... switch} moves a player to: NORMAL if it is in the list, otherwise the first listed
-	 * mode in canonical order (NORMAL, EASY, HARD, ELITE, PEACEFUL). Deterministic regardless of how the list was typed.
+	 * Which mode {@link #switchTarget} prefers, in order. Deliberately independent of the enum's display order: a switch should land
+	 * on the mildest change from vanilla, so NORMAL first, then EASY, HARD, ELITE, and PEACEFUL (the no-damage mode) only as a last resort.
+	 */
+	private static final PersonalDifficultyMode[] SWITCH_PRIORITY = {
+		PersonalDifficultyMode.NORMAL, PersonalDifficultyMode.EASY, PersonalDifficultyMode.HARD, PersonalDifficultyMode.ELITE, PersonalDifficultyMode.PEACEFUL
+	};
+
+	/**
+	 * The mode {@code restrict ... switch} moves a player to: the first listed mode in {@link #SWITCH_PRIORITY} (NORMAL, EASY, HARD,
+	 * ELITE, PEACEFUL). Deterministic regardless of how the list was typed, and unchanged by the 1.3.1 display reorder.
 	 */
 	public static PersonalDifficultyMode switchTarget(Set<PersonalDifficultyMode> list) {
-		if (list.contains(PersonalDifficultyMode.NORMAL)) {
-			return PersonalDifficultyMode.NORMAL;
-		}
-		for (PersonalDifficultyMode m : PersonalDifficultyMode.values()) {
+		for (PersonalDifficultyMode m : SWITCH_PRIORITY) {
 			if (list.contains(m)) {
 				return m;
 			}

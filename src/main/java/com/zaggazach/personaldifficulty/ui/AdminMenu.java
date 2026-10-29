@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Set;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import com.mojang.authlib.GameProfile;
+import java.util.UUID;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.NameAndId;
 import net.minecraft.world.item.Item;
@@ -22,7 +24,7 @@ import net.minecraft.world.item.Items;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The administrator menu (Phase 3): Player Management and Difficulty Permissions. One server-side state machine; the client sends
+ * The administrator menu (Phase 3, layout redesigned in 1.3.1-rc.2): Players and Server Difficulties. One server-side state machine; the client sends
  * only a slot index and a click type, and nothing else (page, selected player, pending allow-list) is ever taken from it.
  *
  * <p>Every change goes through {@link AdminService} with this menu's {@link #actor}, so it is the same code, the same refusals, the
@@ -35,26 +37,55 @@ public final class AdminMenu extends PdAdminMenu {
 	static final int PAGE_SIZE = 45;
 	private static final int MAX_LORE_LINES = 14;
 
+	// ---- the navigation bar: identical on every page (an empty slot where an action does not apply)
+	static final int NAV_BACK = 45;
+	static final int NAV_CLOSE = 49;
+	static final int NAV_PREV = 52;
+	static final int NAV_NEXT = 53;
+
+	// ---- hub
+	static final int HUB_PLAYERS = 20;
+	static final int HUB_DIFFICULTIES = 24;
+
+	// ---- player list
+	static final int LIST_PAGE_INFO = 47;
+
+	// ---- player page
+	static final int PLAYER_CARD = 4;
+	static final int RESULT_CARD = 8;
+	static final int SET_LABEL = 18;
+	static final int[] SET_SLOTS = {20, 21, 22, 23, 24};
+	static final int ALLOW_LABEL = 27;
+	static final int[] ALLOW_SLOTS = {29, 30, 31, 32, 33};
+	static final int ALLOW_SAVE = 35;
+	static final int PLAYER_LOCK = 38;
+	static final int PLAYER_ALLOW_ALL = 40;
+	static final int PLAYER_RESET = 42;
+	static final int PLAYER_REPAIR = 22;
+
+	// ---- server difficulties
+	static final int[] POLICY_SLOTS = {20, 21, 22, 23, 24};
+	static final int POLICY_ENABLE_ALL = 31;
+
+	// ---- confirmation screens
+	static final int CONFIRM_LEFT = 20;
+	static final int CONFIRM_MIDDLE = 22;
+	static final int CONFIRM_RIGHT = 24;
+
 	enum Screen {
 		HUB,
 		PLAYERS,
 		PLAYER,
 		POLICY,
-		EDITOR,
-		CONFIRM
-	}
-
-	/** What choosing a player in the list leads to. */
-	enum Purpose {
-		MANAGE,
-		ALLOW_LIST
+		CONFIRM_RESTRICT,
+		CONFIRM_RESET
 	}
 
 	private Screen screen = Screen.HUB;
-	private Purpose purpose = Purpose.MANAGE;
 	private int page;
 	private List<PlayerDirectory.Entry> entries = List.of();
 	private @Nullable NameAndId selected;
+	/** The allow-list being edited on the player page; saved only by the Save button. */
 	private final Set<PersonalDifficultyMode> pending = EnumSet.noneOf(PersonalDifficultyMode.class);
 	private String last = "";
 
@@ -111,13 +142,17 @@ public final class AdminMenu extends PdAdminMenu {
 			player.closeContainer();
 			return;
 		}
+		if (slot == NAV_CLOSE) {
+			player.closeContainer();
+			return;
+		}
 		switch (screen) {
 			case HUB -> pressHub(slot, rt);
 			case PLAYERS -> pressPlayers(slot, rt);
 			case PLAYER -> pressPlayer(slot, rt);
 			case POLICY -> pressPolicy(slot, rt);
-			case EDITOR -> pressEditor(slot, rt);
-			case CONFIRM -> pressConfirm(slot, rt);
+			case CONFIRM_RESTRICT -> pressConfirmRestrict(slot, rt);
+			case CONFIRM_RESET -> pressConfirmReset(slot, rt);
 		}
 		if (stillValid(player)) {
 			render();
@@ -135,13 +170,11 @@ public final class AdminMenu extends PdAdminMenu {
 
 	private void pressHub(int slot, PdRuntime rt) {
 		switch (slot) {
-			case 20 -> {
-				purpose = Purpose.MANAGE;
+			case HUB_PLAYERS -> {
 				loadPlayers(rt);
 				go(Screen.PLAYERS);
 			}
-			case 24 -> go(Screen.POLICY);
-			case 49 -> player.closeContainer();
+			case HUB_DIFFICULTIES -> go(Screen.POLICY);
 			default -> {
 			}
 		}
@@ -151,43 +184,53 @@ public final class AdminMenu extends PdAdminMenu {
 		entries = PlayerDirectory.collect(rt, player.level().getServer());
 	}
 
+	private int pageCount() {
+		return Math.max(1, (entries.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+	}
+
 	private void pressPlayers(int slot, PdRuntime rt) {
 		if (slot < PAGE_SIZE) {
 			int index = page * PAGE_SIZE + slot;
 			if (index >= 0 && index < entries.size()) {
-				selected = entries.get(index).nameAndId();
-				if (purpose == Purpose.ALLOW_LIST && !rt.settings().isQuarantined(selected.id())) {
-					pending.clear();
-					PlayerRecord rec = rt.settings().record(selected.id());
-					if (rec.allowed() != null) {
-						pending.addAll(rec.allowed());
-					}
-					go(Screen.EDITOR);
-				} else {
-					go(Screen.PLAYER);
-				}
+				openPlayer(rt, entries.get(index).nameAndId());
 			}
 			return;
 		}
 		switch (slot) {
-			case 45 -> page = Math.max(0, page - 1);
-			case 53 -> {
-				if ((page + 1) * PAGE_SIZE < entries.size()) {
-					page++;
-				}
-			}
-			case 47 -> {
+			case NAV_BACK -> go(Screen.HUB);
+			case NAV_PREV -> page = Math.max(0, page - 1);
+			case NAV_NEXT -> page = Math.min(pageCount() - 1, page + 1);
+			case LIST_PAGE_INFO -> {
 				loadPlayers(rt);
-				page = Math.min(page, Math.max(0, (entries.size() - 1) / PAGE_SIZE));
+				page = Math.min(page, pageCount() - 1);
 			}
-			case 49 -> go(purpose == Purpose.ALLOW_LIST ? Screen.POLICY : Screen.HUB);
 			default -> {
 			}
 		}
 	}
 
-	private static final int[] MODE_SLOTS_ASSIGN = {18, 19, 20, 21, 22};
-	private static final int[] MODE_SLOTS_LOCK = {27, 28, 29, 30, 31};
+	private void openPlayer(PdRuntime rt, NameAndId target) {
+		selected = target;
+		loadPending(rt, target);
+		go(Screen.PLAYER);
+	}
+
+	/** The editor starts from the stored list; with no list (server policy applies) every difficulty starts ticked. */
+	private void loadPending(PdRuntime rt, NameAndId target) {
+		pending.clear();
+		PlayerRecord rec = rt.settings().record(target.id());
+		if (rec.allowed() != null) {
+			pending.addAll(rec.allowed());
+		} else {
+			pending.addAll(EnumSet.allOf(PersonalDifficultyMode.class));
+		}
+	}
+
+	private boolean pendingDiffersFromStored(PdRuntime rt, NameAndId target) {
+		PlayerRecord rec = rt.settings().record(target.id());
+		Set<PersonalDifficultyMode> stored = rec.allowed() != null ? rec.allowed() : EnumSet.allOf(PersonalDifficultyMode.class);
+		return !pending.equals(stored);
+	}
 
 	private void pressPlayer(int slot, PdRuntime rt) {
 		NameAndId target = selected;
@@ -195,78 +238,25 @@ public final class AdminMenu extends PdAdminMenu {
 			go(Screen.HUB);
 			return;
 		}
-		boolean invalid = rt.settings().isQuarantined(target.id());
-		PersonalDifficultyMode[] modes = PersonalDifficultyMode.values();
-		if (slot == 45) {
+		if (slot == NAV_BACK) {
 			loadPlayers(rt);
 			go(Screen.PLAYERS);
 			return;
 		}
-		if (invalid) {
-			if (slot == 22) {
+		if (rt.settings().isQuarantined(target.id())) {
+			if (slot == PLAYER_REPAIR) {
 				result(AdminService.reset(actor, rt, target));
+				loadPending(rt, target);
 			}
 			return;
 		}
+		PersonalDifficultyMode[] modes = PersonalDifficultyMode.values();
 		for (int i = 0; i < modes.length; i++) {
-			if (slot == MODE_SLOTS_ASSIGN[i]) {
+			if (slot == SET_SLOTS[i]) {
 				result(AdminService.assign(actor, rt, target, modes[i], false));
 				return;
 			}
-			if (slot == MODE_SLOTS_LOCK[i]) {
-				result(AdminService.assign(actor, rt, target, modes[i], true));
-				return;
-			}
-		}
-		switch (slot) {
-			case 36 -> result(AdminService.setLock(actor, rt, target, !rt.settings().record(target.id()).locked()));
-			case 38 -> {
-				pending.clear();
-				PlayerRecord rec = rt.settings().record(target.id());
-				if (rec.allowed() != null) {
-					pending.addAll(rec.allowed());
-				}
-				go(Screen.EDITOR);
-			}
-			case 40 -> result(AdminService.unrestrict(actor, rt, target));
-			case 42 -> result(AdminService.reset(actor, rt, target));
-			default -> {
-			}
-		}
-	}
-
-	private static final int[] POLICY_SLOTS = {11, 12, 13, 14, 15};
-
-	private void pressPolicy(int slot, PdRuntime rt) {
-		PersonalDifficultyMode[] modes = PersonalDifficultyMode.values();
-		for (int i = 0; i < modes.length; i++) {
-			if (slot == POLICY_SLOTS[i]) {
-				result(AdminService.setEnabled(actor, rt, modes[i], !rt.availability().isEnabled(modes[i])));
-				return;
-			}
-		}
-		switch (slot) {
-			case 22 -> result(AdminService.enableAll(actor, rt));
-			case 31 -> {
-				purpose = Purpose.ALLOW_LIST;
-				loadPlayers(rt);
-				go(Screen.PLAYERS);
-			}
-			case 45 -> go(Screen.HUB);
-			default -> {
-			}
-		}
-	}
-
-	private void pressEditor(int slot, PdRuntime rt) {
-		NameAndId target = selected;
-		if (target == null) {
-			go(Screen.POLICY);
-			return;
-		}
-		PersonalDifficultyMode[] modes = PersonalDifficultyMode.values();
-		for (int i = 0; i < modes.length; i++) {
-			if (slot == POLICY_SLOTS[i]) {
+			if (slot == ALLOW_SLOTS[i]) {
 				if (!pending.remove(modes[i])) {
 					pending.add(modes[i]);
 				}
@@ -274,95 +264,174 @@ public final class AdminMenu extends PdAdminMenu {
 			}
 		}
 		switch (slot) {
-			case 29 -> applyAllowList(rt, target);
-			case 31 -> {
-				AdminResult r = AdminService.unrestrict(actor, rt, target);
-				result(r);
-				pending.clear();
+			case ALLOW_SAVE -> saveAllowList(rt, target);
+			case PLAYER_LOCK -> result(AdminService.setLock(actor, rt, target, !rt.settings().record(target.id()).locked()));
+			case PLAYER_ALLOW_ALL -> {
+				result(AdminService.unrestrict(actor, rt, target));
+				loadPending(rt, target);
 			}
-			case 33, 45 -> go(Screen.PLAYER);
+			case PLAYER_RESET -> go(Screen.CONFIRM_RESET);
 			default -> {
 			}
 		}
 	}
 
 	/** D5: when the list would exclude the player's current mode, ask (Switch / Keep / Cancel) instead of choosing for the administrator. */
-	private void applyAllowList(PdRuntime rt, NameAndId target) {
+	private void saveAllowList(PdRuntime rt, NameAndId target) {
 		if (pending.isEmpty()) {
-			actor.feedback().failure(AdminService.EMPTY_LIST);
-			last = AdminService.EMPTY_LIST;
+			actor.feedback().failure(EMPTY_LIST_GUI);
+			last = EMPTY_LIST_GUI;
+			return;
+		}
+		if (!pendingDiffersFromStored(rt, target)) {
+			last = "No changes to save.";
+			return;
+		}
+		if (pending.size() == PersonalDifficultyMode.values().length && rt.settings().record(target.id()).allowed() == null) {
+			last = "No changes to save.";
 			return;
 		}
 		SelectionPolicy.RestrictPlan plan = AdminService.previewRestrict(rt, target, pending, SelectionPolicy.RestrictFlag.NONE, actor.id());
 		if (plan.status() == SelectionPolicy.RestrictStatus.NEEDS_CHOICE) {
-			go(Screen.CONFIRM);
+			go(Screen.CONFIRM_RESTRICT);
 			return;
 		}
-		AdminResult r = AdminService.restrict(actor, rt, target, EnumSet.copyOf(pending), SelectionPolicy.RestrictFlag.NONE);
-		result(r);
-		if (r.applied()) {
-			go(Screen.PLAYER);
+		result(AdminService.restrict(actor, rt, target, EnumSet.copyOf(pending), SelectionPolicy.RestrictFlag.NONE));
+		loadPending(rt, target);
+	}
+
+	static final String EMPTY_LIST_GUI = "An allow-list cannot be empty. Tick at least one difficulty, or use 'Allow all' to remove the restriction.";
+
+	private void pressPolicy(int slot, PdRuntime rt) {
+		if (slot == NAV_BACK) {
+			go(Screen.HUB);
+			return;
+		}
+		PersonalDifficultyMode[] modes = PersonalDifficultyMode.values();
+		for (int i = 0; i < modes.length; i++) {
+			if (slot == POLICY_SLOTS[i]) {
+				result(AdminService.setEnabled(actor, rt, modes[i], !rt.availability().isEnabled(modes[i])));
+				return;
+			}
+		}
+		if (slot == POLICY_ENABLE_ALL) {
+			result(AdminService.enableAll(actor, rt));
 		}
 	}
 
-	private void pressConfirm(int slot, PdRuntime rt) {
+	private void pressConfirmRestrict(int slot, PdRuntime rt) {
 		NameAndId target = selected;
 		if (target == null || pending.isEmpty()) {
-			go(Screen.POLICY);
+			go(Screen.HUB);
 			return;
 		}
 		// the service re-reads the target's CURRENT record and re-checks the actor's authority; nothing decided at preview time is trusted
 		switch (slot) {
-			case 20 -> finishRestrict(AdminService.restrict(actor, rt, target, EnumSet.copyOf(pending), SelectionPolicy.RestrictFlag.SWITCH));
-			case 22 -> finishRestrict(AdminService.restrict(actor, rt, target, EnumSet.copyOf(pending), SelectionPolicy.RestrictFlag.KEEP));
-			case 24 -> {
+			case CONFIRM_LEFT -> finishRestrict(rt, target, AdminService.restrict(actor, rt, target, EnumSet.copyOf(pending), SelectionPolicy.RestrictFlag.SWITCH));
+			case CONFIRM_MIDDLE -> finishRestrict(rt, target, AdminService.restrict(actor, rt, target, EnumSet.copyOf(pending), SelectionPolicy.RestrictFlag.KEEP));
+			case CONFIRM_RIGHT, NAV_BACK -> {
 				last = "Cancelled; nothing changed.";
-				go(Screen.EDITOR);
+				go(Screen.PLAYER);
 			}
 			default -> {
 			}
 		}
 	}
 
-	private void finishRestrict(AdminResult r) {
+	private void finishRestrict(PdRuntime rt, NameAndId target, AdminResult r) {
 		result(r);
-		go(r.applied() || r.outcome() == AdminResult.Outcome.UNCHANGED ? Screen.PLAYER : Screen.EDITOR);
+		if (r.applied() || r.outcome() == AdminResult.Outcome.UNCHANGED) {
+			loadPending(rt, target);
+		}
+		go(Screen.PLAYER);
+	}
+
+	private void pressConfirmReset(int slot, PdRuntime rt) {
+		NameAndId target = selected;
+		if (target == null) {
+			go(Screen.HUB);
+			return;
+		}
+		switch (slot) {
+			case CONFIRM_LEFT -> {
+				result(AdminService.reset(actor, rt, target));
+				loadPending(rt, target);
+				go(Screen.PLAYER);
+			}
+			case CONFIRM_RIGHT, NAV_BACK -> {
+				last = "Cancelled; nothing changed.";
+				go(Screen.PLAYER);
+			}
+			default -> {
+			}
+		}
 	}
 
 	// ------------------------------------------------------------------ rendering
 
-	private static Item itemFor(PersonalDifficultyMode m) {
+	/** One icon per difficulty, rising in toughness from left to right in the menu. */
+	static Item itemFor(PersonalDifficultyMode m) {
 		return switch (m) {
-			case NORMAL -> Items.IRON_INGOT;
-			case EASY -> Items.EMERALD;
-			case HARD -> Items.GOLD_INGOT;
-			case ELITE -> Items.NETHERITE_INGOT;
-			case PEACEFUL -> Items.DIAMOND;
+			case PEACEFUL -> Items.POPPY;
+			case EASY -> Items.WOODEN_SWORD;
+			case NORMAL -> Items.IRON_SWORD;
+			case HARD -> Items.DIAMOND_SWORD;
+			case ELITE -> Items.NETHERITE_SWORD;
 		};
 	}
 
-	private void put(int slot, Item item, String name, ChatFormatting color, String... lore) {
-		List<Component> lines = new ArrayList<>();
-		for (String l : lore) {
-			lines.add(UiItems.grey(l));
-		}
-		show(slot, UiItems.button(item, Text.item(name, color), lines));
+	private static String title(PersonalDifficultyMode m) {
+		String n = m.name();
+		return n.charAt(0) + n.substring(1).toLowerCase(java.util.Locale.ROOT);
 	}
 
-	private void statusCard(int slot, String text) {
+	private static List<Component> lore(String... lines) {
+		List<Component> out = new ArrayList<>();
+		for (String l : lines) {
+			out.add(UiItems.grey(l));
+		}
+		return out;
+	}
+
+	private void put(int slot, Item item, String name, ChatFormatting color, String... lore) {
+		show(slot, UiItems.button(item, Text.item(name, color), lore(lore)));
+	}
+
+	private void putOn(int slot, Item item, boolean on, String name, ChatFormatting color, String... lore) {
+		show(slot, UiItems.button(item, Text.item(name, color), lore(lore), on));
+	}
+
+	private static List<Component> splitLore(String text) {
 		List<Component> lines = new ArrayList<>();
 		String[] split = text.split("\n");
 		for (int i = 0; i < split.length && i < MAX_LORE_LINES; i++) {
 			String l = split[i];
 			lines.add(UiItems.grey(l.length() > 90 ? l.substring(0, 87) + "..." : l));
 		}
-		show(slot, UiItems.button(Items.PAPER, Text.item("Status", ChatFormatting.AQUA), lines));
+		return lines;
+	}
+
+	private void statusCard(int slot, String heading, String text) {
+		show(slot, UiItems.button(Items.PAPER, Text.item(heading, ChatFormatting.AQUA), splitLore(text)));
 	}
 
 	private void lastResult(int slot) {
 		if (!last.isEmpty()) {
-			statusCard(slot, "Last result:\n" + last);
+			statusCard(slot, "Last result", last);
 		}
+	}
+
+	private @Nullable GameProfile onlineProfile(UUID id) {
+		ServerPlayer online = player.level().getServer().getPlayerList().getPlayer(id);
+		return online != null ? online.getGameProfile() : null;
+	}
+
+	/** The same bar on every page: Back bottom-left, Close bottom-middle, page arrows bottom-right. */
+	private void navBar(boolean back) {
+		if (back) {
+			put(NAV_BACK, Items.ARROW, "Back", ChatFormatting.YELLOW);
+		}
+		put(NAV_CLOSE, Items.BARRIER, "Close", ChatFormatting.RED);
 	}
 
 	private void render() {
@@ -371,24 +440,26 @@ public final class AdminMenu extends PdAdminMenu {
 		if (rt == null) {
 			return;
 		}
-		for (int i = 0; i < ROWS * 9; i++) {
-			show(i, UiItems.filler());
-		}
 		switch (screen) {
 			case HUB -> renderHub();
 			case PLAYERS -> renderPlayers(rt);
 			case PLAYER -> renderPlayer(rt);
 			case POLICY -> renderPolicy(rt);
-			case EDITOR -> renderEditor(rt);
-			case CONFIRM -> renderConfirm(rt);
+			case CONFIRM_RESTRICT -> renderConfirmRestrict(rt);
+			case CONFIRM_RESET -> renderConfirmReset(rt);
 		}
 	}
 
 	private void renderHub() {
-		put(20, Items.COMPASS, "Player Management", ChatFormatting.GREEN, "Assign, lock and restrict players;", "repair invalid stored records.");
-		put(24, Items.BOOK, "Difficulty Permissions", ChatFormatting.GOLD, "Enable or disable difficulties server-wide", "and edit per-player allow-lists.");
-		put(49, Items.BARRIER, "Close", ChatFormatting.RED);
+		show(HUB_PLAYERS, UiItems.head(player.getUUID(), player.getGameProfile(), Text.item("Players", ChatFormatting.GREEN),
+			lore("See every player's difficulty, and set,", "lock or restrict it.")));
+		put(HUB_DIFFICULTIES, Items.COMPARATOR, "Server Difficulties", ChatFormatting.GOLD, "Turn difficulties on or off", "for the whole server.");
 		lastResult(4);
+		navBar(false);
+	}
+
+	private String allowedText(PlayerRecord rec) {
+		return rec.allowed() == null ? "all (server policy)" : AdminService.names(rec.allowed());
 	}
 
 	private void renderPlayers(PdRuntime rt) {
@@ -399,22 +470,23 @@ public final class AdminMenu extends PdAdminMenu {
 				break;
 			}
 			PlayerDirectory.Entry e = entries.get(index);
-			PlayerRecord rec = rt.settings().record(e.id());
-			boolean invalid = rt.settings().isQuarantined(e.id());
 			String where = e.online() ? "online" : "offline";
-			if (invalid) {
-				put(slot, Items.BARRIER, e.label(), ChatFormatting.RED, "INVALID STORED RECORD (" + where + ")", "Click to see how to repair it.");
-			} else {
-				put(slot, itemFor(rec.mode()), e.label(), e.online() ? ChatFormatting.GREEN : ChatFormatting.WHITE,
-					rec.mode().name() + (rec.locked() ? ", locked" : "") + (rec.allowed() != null ? ", restricted" : "") + " (" + where + ")",
-					purpose == Purpose.ALLOW_LIST ? "Click to edit the allow-list." : "Click to manage.");
+			if (rt.settings().isQuarantined(e.id())) {
+				put(slot, Items.BARRIER, e.label(), ChatFormatting.RED, "Invalid stored record (" + where + ")", "Click to repair it.");
+				continue;
 			}
+			PlayerRecord rec = rt.settings().record(e.id());
+			show(slot, UiItems.head(e.id(), e.online() ? onlineProfile(e.id()) : null, Text.item(e.label(), e.online() ? ChatFormatting.GREEN : ChatFormatting.WHITE),
+				lore("Difficulty: " + title(rec.mode()), "Status: " + where, "Locked: " + (rec.locked() ? "yes" : "no"), "Allowed: " + allowedText(rec), "", "Click to manage.")));
 		}
-		int pages = Math.max(1, (entries.size() + PAGE_SIZE - 1) / PAGE_SIZE);
-		put(45, Items.ARROW, "Previous page", ChatFormatting.YELLOW);
-		put(47, Items.PAPER, "Page " + (page + 1) + " of " + pages, ChatFormatting.AQUA, entries.size() + " player(s) known", "Click to refresh the list.");
-		put(49, Items.BARRIER, "Back", ChatFormatting.RED);
-		put(53, Items.ARROW, "Next page", ChatFormatting.YELLOW);
+		put(LIST_PAGE_INFO, Items.PAPER, "Page " + (page + 1) + " of " + pageCount(), ChatFormatting.AQUA, entries.size() + " player(s) known", "Click to refresh the list.");
+		navBar(true);
+		if (page > 0) {
+			put(NAV_PREV, Items.ARROW, "Previous page", ChatFormatting.YELLOW);
+		}
+		if (page < pageCount() - 1) {
+			put(NAV_NEXT, Items.ARROW, "Next page", ChatFormatting.YELLOW);
+		}
 	}
 
 	private void renderPlayer(PdRuntime rt) {
@@ -422,66 +494,78 @@ public final class AdminMenu extends PdAdminMenu {
 		if (target == null) {
 			return;
 		}
-		statusCard(4, AdminService.statusText(rt, target));
-		lastResult(8);
-		PersonalDifficultyMode[] modes = PersonalDifficultyMode.values();
-		if (rt.settings().isQuarantined(target.id())) {
-			put(22, Items.REDSTONE, "Repair invalid record", ChatFormatting.RED, "Replaces the unreadable record by a default one", "(NORMAL, unlocked, no allow-list).", "A verified backup is made first;", "unknown fields are kept.");
-		} else {
-			for (int i = 0; i < modes.length; i++) {
-				put(MODE_SLOTS_ASSIGN[i], itemFor(modes[i]), "Assign " + modes[i].name(), ChatFormatting.GREEN, "Sets the difficulty regardless of", "server policy, allow-list or lock.");
-				put(MODE_SLOTS_LOCK[i], itemFor(modes[i]), "Assign " + modes[i].name() + " and lock", ChatFormatting.GOLD, "Sets the difficulty and locks it.");
-			}
-			boolean locked = rt.settings().record(target.id()).locked();
-			put(36, Items.TRIPWIRE_HOOK, locked ? "Unlock" : "Lock", ChatFormatting.GOLD, locked ? "The player can choose again." : "Only an administrator can change it.");
-			put(38, Items.BOOK, "Edit allow-list", ChatFormatting.AQUA, "Choose which difficulties this", "player may select.");
-			put(40, Items.LEVER, "Remove allow-list", ChatFormatting.YELLOW, "The server policy applies again.");
-			put(42, Items.REDSTONE, "Reset", ChatFormatting.RED, "NORMAL, unlock, no allow-list.");
+		boolean invalid = rt.settings().isQuarantined(target.id());
+		show(PLAYER_CARD, UiItems.head(target.id(), onlineProfile(target.id()), Text.item(target.name(), invalid ? ChatFormatting.RED : ChatFormatting.AQUA),
+			splitLore(AdminService.statusText(rt, target))));
+		lastResult(RESULT_CARD);
+		navBar(true);
+		if (invalid) {
+			put(PLAYER_REPAIR, Items.REDSTONE, "Repair invalid record", ChatFormatting.RED, "Replaces the unreadable record with a default one", "(Normal, unlocked, no allow-list).", "A verified backup is made first;", "unknown fields are kept.");
+			return;
 		}
-		put(45, Items.ARROW, "Back to the list", ChatFormatting.YELLOW);
+		PlayerRecord rec = rt.settings().record(target.id());
+		PersonalDifficultyMode[] modes = PersonalDifficultyMode.values();
+
+		put(SET_LABEL, Items.OAK_SIGN, "Set difficulty", ChatFormatting.WHITE, "Click a difficulty to put", target.name() + " on it. The glowing", "one is their current difficulty.");
+		for (int i = 0; i < modes.length; i++) {
+			boolean current = rec.mode() == modes[i];
+			putOn(SET_SLOTS[i], itemFor(modes[i]), current, title(modes[i]) + (current ? " (current)" : ""), current ? ChatFormatting.GREEN : ChatFormatting.WHITE,
+				current ? "This is their difficulty now." : "Click to set " + target.name() + " to " + title(modes[i]) + ".",
+				"Works even if it is disabled, not allowed", "for them, or they are locked.");
+		}
+
+		put(ALLOW_LABEL, Items.OAK_SIGN, "Allowed difficulties", ChatFormatting.WHITE, "Which difficulties " + target.name(), "may pick for themselves.", "Click to tick or untick, then Save.");
+		for (int i = 0; i < modes.length; i++) {
+			boolean on = pending.contains(modes[i]);
+			putOn(ALLOW_SLOTS[i], itemFor(modes[i]), on, title(modes[i]) + (on ? ": allowed" : ": not allowed"), on ? ChatFormatting.GREEN : ChatFormatting.GRAY,
+				"Click to " + (on ? "untick." : "tick."));
+		}
+		boolean dirty = pendingDiffersFromStored(rt, target);
+		putOn(ALLOW_SAVE, Items.WRITABLE_BOOK, dirty, "Save allowed list", dirty ? ChatFormatting.GREEN : ChatFormatting.GRAY,
+			dirty ? "You have unsaved changes." : "No changes to save.", "Saved now: " + allowedText(rec));
+
+		putOn(PLAYER_LOCK, Items.TRIPWIRE_HOOK, rec.locked(), "Lock: " + (rec.locked() ? "ON" : "OFF"), rec.locked() ? ChatFormatting.RED : ChatFormatting.GREEN,
+			rec.locked() ? "Only an admin can change their difficulty." : "They can change their own difficulty.", "Click to turn " + (rec.locked() ? "off." : "on."));
+		put(PLAYER_ALLOW_ALL, Items.MAP, "Allow all", ChatFormatting.YELLOW, "Removes their allowed list, so the", "server's settings apply to them again.");
+		put(PLAYER_RESET, Items.REDSTONE, "Reset player", ChatFormatting.RED, "Normal, unlocked, no allowed list.", "Asks you to confirm first.");
 	}
 
 	private void renderPolicy(PdRuntime rt) {
 		PersonalDifficultyMode[] modes = PersonalDifficultyMode.values();
 		for (int i = 0; i < modes.length; i++) {
 			boolean enabled = rt.availability().isEnabled(modes[i]);
-			put(POLICY_SLOTS[i], itemFor(modes[i]), modes[i].name() + ": " + (enabled ? "ENABLED" : "DISABLED"), enabled ? ChatFormatting.GREEN : ChatFormatting.RED,
-				enabled ? "Click to disable (saved selections are kept)." : "Click to enable.", rt.settings().countUsing(modes[i]) + " saved selection(s) use it.");
+			putOn(POLICY_SLOTS[i], itemFor(modes[i]), enabled, title(modes[i]) + ": " + (enabled ? "ON" : "OFF"), enabled ? ChatFormatting.GREEN : ChatFormatting.RED,
+				enabled ? "Players can pick it. Click to turn off." : "Players cannot pick it. Click to turn on.",
+				rt.settings().countUsing(modes[i]) + " player(s) are on it now.", "Turning it off never moves anyone.");
 		}
-		put(22, Items.EMERALD, "Enable all", ChatFormatting.GREEN);
-		put(31, Items.BOOK, "Per-player allow-lists", ChatFormatting.AQUA, "Pick a player to edit.");
-		put(45, Items.BARRIER, "Back", ChatFormatting.RED);
+		put(POLICY_ENABLE_ALL, Items.EMERALD, "Turn all on", ChatFormatting.GREEN);
 		lastResult(4);
+		navBar(true);
 	}
 
-	private void renderEditor(PdRuntime rt) {
-		NameAndId target = selected;
-		if (target == null) {
-			return;
-		}
-		statusCard(4, "Allow-list for " + target.name() + "\n" + AdminService.statusText(rt, target));
-		lastResult(8);
-		PersonalDifficultyMode[] modes = PersonalDifficultyMode.values();
-		for (int i = 0; i < modes.length; i++) {
-			boolean on = pending.contains(modes[i]);
-			put(POLICY_SLOTS[i], itemFor(modes[i]), (on ? "[x] " : "[ ] ") + modes[i].name(), on ? ChatFormatting.GREEN : ChatFormatting.GRAY, "Click to toggle.");
-		}
-		put(29, Items.EMERALD, "Apply allow-list", ChatFormatting.GREEN, "At least one difficulty must be ticked.");
-		put(31, Items.LEVER, "Remove allow-list", ChatFormatting.YELLOW);
-		put(33, Items.BARRIER, "Cancel", ChatFormatting.RED);
-		put(45, Items.ARROW, "Back", ChatFormatting.YELLOW);
-	}
-
-	private void renderConfirm(PdRuntime rt) {
+	private void renderConfirmRestrict(PdRuntime rt) {
 		NameAndId target = selected;
 		if (target == null) {
 			return;
 		}
 		PlayerRecord rec = rt.settings().record(target.id());
 		Set<PersonalDifficultyMode> list = pending.isEmpty() ? EnumSet.of(PersonalDifficultyMode.NORMAL) : EnumSet.copyOf(pending);
-		statusCard(4, target.name() + " is on " + rec.mode().name() + ",\nwhich is not in the new list (" + AdminService.names(list) + ").\nChoose what happens to them.");
-		put(20, Items.ARROW, "Switch", ChatFormatting.GREEN, "Move them to " + SelectionPolicy.switchTarget(list).name() + ",", "then apply the allow-list.");
-		put(22, Items.IRON_INGOT, "Keep", ChatFormatting.GOLD, "They stay on " + rec.mode().name() + " as an exception", "outside the list; once they switch away", "they cannot switch back.");
-		put(24, Items.BARRIER, "Cancel", ChatFormatting.RED, "Change nothing.");
+		PersonalDifficultyMode to = SelectionPolicy.switchTarget(list);
+		statusCard(4, "Choose what happens", target.name() + " is on " + title(rec.mode()) + ",\nwhich is not in the new list (" + AdminService.names(list) + ").");
+		put(CONFIRM_LEFT, itemFor(to), "Switch them to " + title(to), ChatFormatting.GREEN, "Move them to " + title(to) + ",", "then save the list.");
+		put(CONFIRM_MIDDLE, itemFor(rec.mode()), "Keep them on " + title(rec.mode()), ChatFormatting.GOLD, "They stay on " + title(rec.mode()) + " as an exception;", "once they switch away", "they cannot switch back.");
+		put(CONFIRM_RIGHT, Items.ARROW, "Cancel", ChatFormatting.RED, "Change nothing.");
+		navBar(true);
+	}
+
+	private void renderConfirmReset(PdRuntime rt) {
+		NameAndId target = selected;
+		if (target == null) {
+			return;
+		}
+		statusCard(4, "Reset " + target.name() + "?", "Sets Normal, unlocks them and removes\ntheir allowed list.");
+		put(CONFIRM_LEFT, Items.REDSTONE, "Yes, reset", ChatFormatting.RED, "Reset " + target.name() + " now.");
+		put(CONFIRM_RIGHT, Items.ARROW, "Cancel", ChatFormatting.YELLOW, "Change nothing.");
+		navBar(true);
 	}
 }
