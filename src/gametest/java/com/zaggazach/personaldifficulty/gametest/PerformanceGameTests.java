@@ -187,14 +187,15 @@ public class PerformanceGameTests {
 	private static final int HUNTERS = 30;
 
 	/**
-	 * Worst case for the Elite path-search budget (9x vanilla's node count): every search for an UNREACHABLE target uses the
-	 * whole budget, every time the mob re-plans. {@value #HUNTERS} zombies 44-58 blocks from a player standing on top of an
+	 * Worst case for Elite path searches: every search for an UNREACHABLE target uses the whole node budget, every time the mob
+	 * re-plans. With a 9x budget (tried for plan 6.2) this measured +7.73 ms (p95 25 ms) and was removed; it now measures the
+	 * vanilla budget with the 3x search length. {@value #HUNTERS} zombies 44-58 blocks from a player standing on top of an
 	 * 8-block stone pillar (visible, never reachable). Windows alternate: the player Normal (beyond the zombies' vanilla range,
 	 * so nobody hunts: the baseline) and the player Elite (all of them hunt, with the large budget, and fail). Opt-in like the
 	 * main measurement; it fails only if the scenario broke (the zombies did not hunt the Elite player).
 	 */
 	@GameTest(environment = PERF_UNREACHABLE, maxTicks = WARMUP + 6 * WINDOW + 100)
-	public void perf_unreachableElitePlayer_30HuntersWithTheLargePathBudget(GameTestHelper h) {
+	public void perf_unreachableElitePlayer_30HuntersThatCanNeverReachThem(GameTestHelper h) {
 		if (!Boolean.getBoolean("pd.perf")) {
 			h.succeed();
 			return;

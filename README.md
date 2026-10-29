@@ -181,9 +181,15 @@ with its ordinary pathfinder - around obstacles, never through them - and gives 
 the player is *now*: once the player moves, the point is stale. Each mob searches a sighting once; sightings are kept for
 `elite.alert.memory-seconds` (default 60). Only Elite sightings are passed on. `elite.alert.enabled=false` switches it off.
 
+**Known limitation: long detours.** On open ground an Elite hunter keeps closing in on a player up to its full range (measured:
+96 to 28 blocks in 30 s). Around a large obstacle it may not: a zombie 94 blocks from an Elite player across a 75-block chasm
+walked to the chasm's edge and stopped there, because its route search came back partial. Giving the route search 9x more work
+did not fix that and made mobs hunting an unreachable player very expensive (+7.7 ms per tick for 30 zombies), so it was not
+kept. The alert network still sends idle mobs to where the player was seen.
+
 Performance (200 hostile mobs, 5 Elite players, 16-thread desktop): 3x detection, 5x memory and the alert network together
-measured within the plan's 1 ms-per-tick budget over the no-Elite baseline in three runs (+0.24, -0.05, -0.05 ms; run-to-run
-noise is about 0.3 ms). Detection range is the costliest part (+0.3 to +0.9 ms); lower the multiplier or the cap if a server
+measured within the plan's 1 ms-per-tick budget over the no-Elite baseline in every run (+0.24, -0.05, -0.05, +0.67, -0.02 ms;
+run-to-run noise is about 0.3-0.5 ms). Detection range is the costliest part (+0.3 to +0.9 ms); lower the multiplier or the cap if a server
 is short of tick time.
 
 #### Elite combat effects (1.3.0)
