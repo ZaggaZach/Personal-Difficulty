@@ -162,6 +162,7 @@ public class EliteDefaultsGameTests {
 		for (ServerPlayer p : java.util.List.of(pC, pP, pO)) {
 			p.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 100000, 4, false, false));
 		}
+		int[][] chasmRoutes = new int[1][3]; // diagnostics, sampled every 10 ticks: [complete, partial, none]
 		long[] chasmDroppedAt = {-1};
 		int[] chasmRetaken = {0};
 		long[] pillarGaveUpAt = {-1};
@@ -184,6 +185,10 @@ public class EliteDefaultsGameTests {
 			if (t <= 5) {
 				return;
 			}
+			if (t % 10 == 0) {
+				var route = mC.getNavigation().getPath();
+				chasmRoutes[0][route == null ? 2 : route.canReach() ? 0 : 1]++;
+			}
 			if (chasmDroppedAt[0] < 0 && mC.getTarget() != pC) {
 				chasmDroppedAt[0] = t;
 			} else if (chasmDroppedAt[0] >= 0 && mC.getTarget() == pC) {
@@ -203,6 +208,10 @@ public class EliteDefaultsGameTests {
 			String report = String.format(java.util.Locale.ROOT,
 				"STALL chasm: dropped at tick %d, re-taken for %d ticks after | pillar: gave up at tick %d, then held %d/%d ticks (vanilla range) | open: held %d/%d, gave up %b",
 				chasmDroppedAt[0], chasmRetaken[0], pillarGaveUpAt[0], pillarHeldAfter[0], pillarTicksAfter[0], openHeld[0], openTicks[0], openGaveUp[0]);
+			var memC = (com.zaggazach.personaldifficulty.logic.HuntingMob) mC;
+			report += String.format(java.util.Locale.ROOT, " | chasm diagnostics: routes complete/partial/none %d/%d/%d, watch since %d best %.1f, gave up on %s until %d, closest %.1f",
+				chasmRoutes[0][0], chasmRoutes[0][1], chasmRoutes[0][2], memC.personaldifficulty$stallSince(), memC.personaldifficulty$stallBest(),
+				memC.personaldifficulty$gaveUpOn(), memC.personaldifficulty$gaveUpUntil(), mC.distanceTo(pC));
 			System.out.println(report);
 			check(chasmDroppedAt[0] > 0, "chasm: the zombie gave up on the Elite player it could not reach: " + report);
 			check(chasmRetaken[0] == 0, "chasm: and did not take them back during the retry delay: " + report);

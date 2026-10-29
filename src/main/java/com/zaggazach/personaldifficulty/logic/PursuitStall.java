@@ -29,13 +29,29 @@ public final class PursuitStall {
 		}
 	}
 
+	/** What the mob's navigation shows at the moment of an observation. */
+	public enum Route {
+		/** A route that reaches the target. */
+		COMPLETE,
+		/** A route that ends short of the target. */
+		PARTIAL,
+		/**
+		 * No current route (between re-plans, or the end of a partial route was just reached). Says nothing either way: found
+		 * live, a stalled zombie had no route at about a third of its scan ticks, and treating that as "complete" reset the watch.
+		 */
+		NONE
+	}
+
 	/**
-	 * The next state: not watching while the route is complete (or there is none yet); a new watch, or a restarted one when the mob
-	 * got {@link #PROGRESS} closer than its best; otherwise unchanged.
+	 * The next state: not watching while the route is complete; unchanged while there is no route; a new watch, or a restarted one
+	 * when the mob got {@link #PROGRESS} closer than its best, while the route is partial; otherwise unchanged.
 	 */
-	public static State next(State s, boolean routePartial, double distance, long now) {
-		if (!routePartial || !Double.isFinite(distance)) {
+	public static State next(State s, Route route, double distance, long now) {
+		if (route == Route.COMPLETE || !Double.isFinite(distance)) {
 			return State.NONE;
+		}
+		if (route == Route.NONE) {
+			return s;
 		}
 		if (!s.watching() || distance < s.best() - PROGRESS) {
 			return new State(Math.max(now, 1), distance);

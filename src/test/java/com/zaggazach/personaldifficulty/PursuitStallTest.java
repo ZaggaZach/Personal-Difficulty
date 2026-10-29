@@ -3,51 +3,62 @@ package com.zaggazach.personaldifficulty;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.zaggazach.personaldifficulty.logic.PursuitStall;
+import com.zaggazach.personaldifficulty.logic.PursuitStall.Route;
 import com.zaggazach.personaldifficulty.logic.PursuitStall.State;
 import org.junit.jupiter.api.Test;
 
 class PursuitStallTest {
 	@Test
 	void aCompleteRouteNeverStartsOrKeepsAWatch() {
-		State s = PursuitStall.next(State.NONE, false, 50, 100);
+		State s = PursuitStall.next(State.NONE, Route.COMPLETE, 50, 100);
 		assertFalse(s.watching());
-		s = PursuitStall.next(new State(10, 40), false, 40, 500);
+		s = PursuitStall.next(new State(10, 40), Route.COMPLETE, 40, 500);
 		assertFalse(s.watching(), "a complete route ends the watch");
 	}
 
 	@Test
 	void partialRoutesWithoutProgressGiveUpAfterExactlyFiveSeconds() {
-		State s = PursuitStall.next(State.NONE, true, 50, 1000);
+		State s = PursuitStall.next(State.NONE, Route.PARTIAL, 50, 1000);
 		assertTrue(s.watching());
 		for (long t = 1010; t < 1100; t += 10) {
-			s = PursuitStall.next(s, true, 50.5, t); // standing at the foot of the pillar, a little jitter
+			s = PursuitStall.next(s, Route.PARTIAL, 50.5, t); // standing at the foot of the pillar, a little jitter
 			assertFalse(PursuitStall.givesUp(s, t), "not yet at " + t);
 		}
-		s = PursuitStall.next(s, true, 49.5, 1100);
+		s = PursuitStall.next(s, Route.PARTIAL, 49.5, 1100);
 		assertTrue(PursuitStall.givesUp(s, 1100), "100 ticks without getting a whole block closer");
 	}
 
 	@Test
 	void realProgressRestartsTheWatch() {
-		State s = PursuitStall.next(State.NONE, true, 50, 1000);
-		s = PursuitStall.next(s, true, 48.9, 1090); // 1.1 blocks closer
+		State s = PursuitStall.next(State.NONE, Route.PARTIAL, 50, 1000);
+		s = PursuitStall.next(s, Route.PARTIAL, 48.9, 1090); // 1.1 blocks closer
 		assertEquals(1090, s.since());
 		assertFalse(PursuitStall.givesUp(s, 1150));
-		assertTrue(PursuitStall.givesUp(PursuitStall.next(s, true, 48.5, 1190), 1190));
+		assertTrue(PursuitStall.givesUp(PursuitStall.next(s, Route.PARTIAL, 48.5, 1190), 1190));
 	}
 
 	@Test
 	void movingAwayIsNotProgress_andGarbageDistanceEndsTheWatch() {
-		State s = PursuitStall.next(State.NONE, true, 50, 1000);
-		s = PursuitStall.next(s, true, 70, 1050);
+		State s = PursuitStall.next(State.NONE, Route.PARTIAL, 50, 1000);
+		s = PursuitStall.next(s, Route.PARTIAL, 70, 1050);
 		assertEquals(1000, s.since(), "a detour that gets farther away does not restart the watch");
-		assertFalse(PursuitStall.next(s, true, Double.NaN, 1060).watching());
+		assertFalse(PursuitStall.next(s, Route.PARTIAL, Double.NaN, 1060).watching());
 	}
 
 	@Test
 	void gameTimeZeroStillStartsAWatch_andTheGiveUpExpires() {
-		assertTrue(PursuitStall.next(State.NONE, true, 50, 0).watching());
+		assertTrue(PursuitStall.next(State.NONE, Route.PARTIAL, 50, 0).watching());
 		assertTrue(PursuitStall.stillGivenUp(1600, 1599));
 		assertFalse(PursuitStall.stillGivenUp(1600, 1600));
+	}
+
+	@Test
+	void noRouteBetweenRePlansNeitherResetsNorStartsTheWatch() {
+		assertFalse(PursuitStall.next(State.NONE, Route.NONE, 50, 100).watching());
+		State s = PursuitStall.next(State.NONE, Route.PARTIAL, 50, 1000);
+		for (long t = 1010; t <= 1100; t += 10) {
+			s = PursuitStall.next(s, t % 30 == 0 ? Route.NONE : Route.PARTIAL, 50, t); // a third of the scans see no route
+		}
+		assertTrue(PursuitStall.givesUp(s, 1100), "found live: gaps without a route must not reset the watch");
 	}
 }

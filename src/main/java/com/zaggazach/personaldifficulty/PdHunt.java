@@ -182,9 +182,9 @@ public final class PdHunt {
 			return;
 		}
 		Path path = mob.getNavigation().getPath();
-		boolean partial = path != null && !path.canReach();
+		PursuitStall.Route route = path == null ? PursuitStall.Route.NONE : path.canReach() ? PursuitStall.Route.COMPLETE : PursuitStall.Route.PARTIAL;
 		PursuitStall.State s = PursuitStall.next(new PursuitStall.State(memory.personaldifficulty$stallSince(), memory.personaldifficulty$stallBest()),
-			partial, mob.distanceTo(hunted), now);
+			route, mob.distanceTo(hunted), now);
 		if (!PursuitStall.givesUp(s, now)) {
 			memory.personaldifficulty$setStall(s.since(), s.best());
 			return;

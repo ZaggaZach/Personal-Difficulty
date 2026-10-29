@@ -276,8 +276,9 @@ public class PerformanceGameTests {
 					for (int lane = 0; lane < 2; lane++) {
 						List<Long> v = samples.get(part).get(lane);
 						mean[lane] = mean(v);
-						out.append(String.format(Locale.ROOT, "PERF-UNREACHABLE %-17s player %-6s mean %6.2f ms  sd %5.2f  p95 %6.2f  (n=%d)  zombies hunting %.1f%n",
-							name, lane == 1 ? "Elite" : "Normal", mean[lane] / 1e6, sd(v, mean[lane]) / 1e6, p95(v) / 1e6, v.size(),
+						out.append(String.format(Locale.ROOT, "PERF-UNREACHABLE %-17s player %-6s mean %6.2f ms  median %6.2f  sd %5.2f  p95 %6.2f  max %7.2f  (n=%d)  zombies hunting %.1f%n",
+							name, lane == 1 ? "Elite" : "Normal", mean[lane] / 1e6, median(v) / 1e6, sd(v, mean[lane]) / 1e6, p95(v) / 1e6,
+							v.stream().mapToLong(Long::longValue).max().orElse(0) / 1e6, v.size(),
 							counted[part][lane] == 0 ? 0.0 : hunting[part][lane] / (double) counted[part][lane]));
 					}
 					double diff = (mean[1] - mean[0]) / 1e6;
@@ -337,6 +338,14 @@ public class PerformanceGameTests {
 
 	private static double sd(List<Long> v, double mean) {
 		return Math.sqrt(v.stream().mapToDouble(x -> (x - mean) * (x - mean)).average().orElse(0));
+	}
+
+	private static double median(List<Long> v) {
+		if (v.isEmpty()) {
+			return 0;
+		}
+		List<Long> sorted = v.stream().sorted().toList();
+		return sorted.get(sorted.size() / 2);
 	}
 
 	private static double p95(List<Long> v) {
