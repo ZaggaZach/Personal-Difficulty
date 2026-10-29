@@ -31,6 +31,19 @@ public final class PdLastKnownGoal extends Goal {
 	static final int MAX_REPLANS = 8;
 	/** Walking speed modifier: the mob's ordinary pace, as vanilla uses for chasing. */
 	static final double SPEED = 1.0;
+	/**
+	 * After a search that did NOT reach the point (no route, out of plans, timed out), the mob ignores further sightings of that
+	 * player for this long (10 s). Without it, a mob near a player it cannot reach (on top of a pillar) started a new, failing
+	 * search after every fresh sighting by the mobs that can see them - measured: about +1.9 ms per tick for 20 such zombies.
+	 */
+	static final int RETRY_AFTER_FAILED_TICKS = 200;
+
+	/** Diagnostics: route plans made by this goal since the server started (read by the performance measurement). */
+	private static long plansMade;
+
+	public static long plansMade() {
+		return plansMade;
+	}
 
 	private final PathfinderMob mob;
 	private AlertBoard.@Nullable Known searching;
@@ -87,6 +100,7 @@ public final class PdLastKnownGoal extends Goal {
 			return;
 		}
 		this.plans++;
+		plansMade++;
 		if (!mob.getNavigation().moveTo(k.x(), k.y(), k.z(), SPEED)) {
 			this.failedPlans++;
 		}
@@ -113,7 +127,10 @@ public final class PdLastKnownGoal extends Goal {
 	public void stop() {
 		AlertBoard.Known k = this.searching;
 		if (k != null) {
-			((HuntingMob) mob).personaldifficulty$markSearched(k.player(), k.tick());
+			boolean arrived = mob.distanceToSqr(k.x(), k.y(), k.z()) <= ARRIVED * ARRIVED;
+			// a failed search also covers every sighting of that player for the next RETRY_AFTER_FAILED_TICKS
+			long covered = arrived ? k.tick() : Math.max(k.tick(), mob.level().getGameTime() + RETRY_AFTER_FAILED_TICKS);
+			((HuntingMob) mob).personaldifficulty$markSearched(k.player(), covered);
 		}
 		this.searching = null;
 		mob.getNavigation().stop();
