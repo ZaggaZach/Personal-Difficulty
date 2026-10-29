@@ -145,7 +145,7 @@ public class PlayerPolicyGameTests {
 			for (PermissionSet perms : List.of(PermissionSet.NO_PERMISSIONS, LevelBasedPermissionSet.GAMEMASTER)) {
 				for (PersonalDifficultyMode m : List.of(HARD, ELITE, PEACEFUL)) {
 					Outcome o = self(server, p, perms, m.commandName());
-					check(o.result() == 0 && o.output().contains("not in the list") && o.output().contains("Available to you: normal, easy"), "refused with a specific reason (" + perms + ", " + m + "): " + o);
+					check(o.result() == 0 && o.output().contains("not in the list") && o.output().contains("Available to you: easy, normal"), "refused with a specific reason (" + perms + ", " + m + "): " + o);
 				}
 			}
 			check(self(server, p, PermissionSet.NO_PERMISSIONS, "easy").result() == 1 && rec(p).mode() == EASY, "listed modes work");
@@ -160,7 +160,7 @@ public class PlayerPolicyGameTests {
 			restoreAvailability();
 
 			Outcome status = self(server, p, PermissionSet.NO_PERMISSIONS, "status");
-			check(status.output().contains("An administrator limits you to: normal, easy") && status.output().contains("You can select: normal, easy"), "status: " + status);
+			check(status.output().contains("An administrator limits you to: easy, normal") && status.output().contains("You can select: easy, normal"), "status: " + status);
 
 			// R6: unrestrict removes only the allow-list
 			admin(server, "lock pd_pp_allow");

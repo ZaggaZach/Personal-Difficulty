@@ -283,11 +283,10 @@ public final class AdminMenu extends PdAdminMenu {
 			last = EMPTY_LIST_GUI;
 			return;
 		}
-		if (!pendingDiffersFromStored(rt, target)) {
-			last = "No changes to save.";
-			return;
-		}
-		if (pending.size() == PersonalDifficultyMode.values().length && rt.settings().record(target.id()).allowed() == null) {
+		// no list stored and every difficulty still ticked: saving would CREATE a list of all five, which is not "no restriction"
+		// (it would no longer follow the server policy), so this is a no-op. Any other save goes to the service, exactly like the
+		// command (which also reports "already ...; nothing changed" for an identical list).
+		if (rt.settings().record(target.id()).allowed() == null && !pendingDiffersFromStored(rt, target)) {
 			last = "No changes to save.";
 			return;
 		}

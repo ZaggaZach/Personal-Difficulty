@@ -94,6 +94,49 @@ public class AdminMenuGameTests {
 		return rec;
 	}
 
+	// ---- the 1.3.1-rc.2 layout (see AdminMenu): one player page, a fixed navigation bar
+	private static final int HUB_PLAYERS = 20;
+	private static final int HUB_DIFFICULTIES = 24;
+	private static final int SAVE = 35;
+	private static final int LOCK = 38;
+	private static final int ALLOW_ALL = 40;
+	private static final int RESET = 42;
+	private static final int REPAIR = 22;
+	private static final int ENABLE_ALL = 31;
+	private static final int CONFIRM_LEFT = 20;
+	private static final int CONFIRM_MIDDLE = 22;
+	private static final int CONFIRM_RIGHT = 24;
+	private static final int BACK = 45;
+	private static final int CLOSE = 49;
+	private static final int NEXT = 53;
+
+	/** Player page, "Set difficulty" row. */
+	private static int set(PersonalDifficultyMode m) {
+		return 20 + m.ordinal();
+	}
+
+	/** Player page, "Allowed difficulties" row. */
+	private static int allow(PersonalDifficultyMode m) {
+		return 29 + m.ordinal();
+	}
+
+	/** Server Difficulties page. */
+	private static int policy(PersonalDifficultyMode m) {
+		return 20 + m.ordinal();
+	}
+
+	/** On the player page of someone WITHOUT a stored allow-list (every box starts ticked): the clicks that untick all but {@code keep}. */
+	private static int[] untickAllBut(PersonalDifficultyMode... keep) {
+		EnumSet<PersonalDifficultyMode> k = keep.length == 0 ? EnumSet.noneOf(PersonalDifficultyMode.class) : EnumSet.copyOf(List.of(keep));
+		return EnumSet.complementOf(k).stream().mapToInt(AdminMenuGameTests::allow).toArray();
+	}
+
+	private static void clickAll(ServerPlayer p, int... slots) {
+		for (int slot : slots) {
+			click(p, slot);
+		}
+	}
+
 	private static void click(ServerPlayer p, int slot) {
 		p.containerMenu.clicked(slot, 0, ContainerInput.PICKUP, p);
 	}
@@ -113,16 +156,16 @@ public class AdminMenuGameTests {
 
 	/** From the hub: opens Player Management and pages until the player is listed, then selects them. */
 	private static void selectPlayer(ServerPlayer admin, String name) {
-		click(admin, 20);
+		click(admin, HUB_PLAYERS);
 		for (int pageNo = 0; pageNo < 60; pageNo++) {
 			for (int slot = 0; slot < 45; slot++) {
 				if (label(admin, slot).equals(name)) {
 					click(admin, slot);
-					check(label(admin, 4).equals("Status"), "the player screen is shown for " + name);
+					check(label(admin, 4).equals(name) && label(admin, SAVE).equals("Save allowed list"), "the player screen is shown for " + name);
 					return;
 				}
 			}
-			click(admin, 53);
+			click(admin, NEXT);
 		}
 		throw new AssertionError(name + " was not found in the player list");
 	}
@@ -179,7 +222,8 @@ public class AdminMenuGameTests {
 			Capture capOp = new Capture();
 			Outcome ok = run(server, "personaldifficulty admin gui", as(admin, LevelBasedPermissionSet.GAMEMASTER, capOp), capOp);
 			check(ok.result() == 1 && isMenu(admin), "an operator gets the menu: " + ok);
-			check(label(admin, 20).equals("Player Management") && label(admin, 24).equals("Difficulty Permissions"), "the hub is shown: " + label(admin, 20));
+			check(label(admin, HUB_PLAYERS).equals("Players") && label(admin, HUB_DIFFICULTIES).equals("Server Difficulties") && label(admin, CLOSE).equals("Close"), "the hub is shown: " + label(admin, 20));
+			check(admin.containerMenu.getSlot(HUB_PLAYERS).getItem().getItem() == net.minecraft.world.item.Items.PLAYER_HEAD, "Players is shown as a player head");
 			Capture capConsole = new Capture();
 			Outcome console = run(server, "personaldifficulty admin gui", console(server, capConsole), capConsole);
 			check(console.result() == 0 && console.output().contains("only be opened by a player"), "the console is told to use the commands: " + console);
@@ -198,7 +242,7 @@ public class AdminMenuGameTests {
 			open(admin);
 			selectPlayer(admin, "0am_demote_t");
 			var menu = admin.containerMenu;
-			click(admin, 18 + HARD.ordinal());
+			click(admin, set(HARD));
 			check(rec(target).mode() == HARD, "while an operator the assignment works");
 			String before = snapshot(server);
 
@@ -212,11 +256,11 @@ public class AdminMenuGameTests {
 			}
 			check(snapshot(server).equals(before), "no click of a demoted operator changed anything");
 			check(admin.containerMenu == menu, "the clicks themselves did not close or navigate the screen (it is closed by the server tick, below)");
-			check(label(admin, 4).equals("Status") && label(admin, 45).equals("Back to the list"), "and the screen content is unchanged: " + label(admin, 45));
+			check(label(admin, 4).equals("0am_demote_t") && label(admin, BACK).equals("Back"), "and the screen content is unchanged: " + label(admin, BACK));
 			admin.doTick();
 			check(admin.containerMenu == admin.inventoryMenu, "the server closes the demoted operator's screen on its next tick");
 			// the stale menu object, even if a client kept sending clicks for it
-			menu.clicked(18 + ELITE.ordinal(), 0, ContainerInput.PICKUP, admin);
+			menu.clicked(set(ELITE), 0, ContainerInput.PICKUP, admin);
 			check(snapshot(server).equals(before) && rec(target).mode() == HARD, "still nothing changed");
 		} finally {
 			finish();
@@ -232,10 +276,9 @@ public class AdminMenuGameTests {
 		try {
 			open(admin);
 			selectPlayer(admin, "0am_demconf_t");
-			click(admin, 38); // allow-list editor
-			click(admin, 11 + HARD.ordinal() - 0); // tick HARD only (slots 11..15 are NORMAL..PEACEFUL)
-			click(admin, 29); // apply: NORMAL is not in the list, so a confirmation is shown
-			check(label(admin, 20).equals("Switch") && label(admin, 22).equals("Keep") && label(admin, 24).equals("Cancel"), "Switch / Keep / Cancel are offered: " + label(admin, 20));
+			clickAll(admin, untickAllBut(HARD)); // the allowed list starts with every box ticked; leave HARD only
+			click(admin, SAVE); // NORMAL is not in the list, so a confirmation is shown
+			check(label(admin, CONFIRM_LEFT).startsWith("Switch") && label(admin, CONFIRM_MIDDLE).startsWith("Keep") && label(admin, CONFIRM_RIGHT).equals("Cancel"), "Switch / Keep / Cancel are offered: " + label(admin, 20));
 			String before = snapshot(server);
 			deop(admin);
 			var menu = admin.containerMenu;
@@ -243,7 +286,7 @@ public class AdminMenuGameTests {
 			menu.clicked(20, 0, ContainerInput.PICKUP, admin);
 			menu.clicked(22, 0, ContainerInput.PICKUP, admin);
 			check(snapshot(server).equals(before), "a confirmation by a demoted operator changes nothing");
-			check(admin.containerMenu == menu && label(admin, 20).equals("Switch"), "and the clicks did not navigate the screen");
+			check(admin.containerMenu == menu && label(admin, CONFIRM_LEFT).startsWith("Switch"), "and the clicks did not navigate the screen");
 			admin.doTick();
 			check(admin.containerMenu == admin.inventoryMenu, "the next tick closes it");
 			check(rec(target).allowed() == null && rec(target).mode() == NORMAL, "no allow-list, no switch");
@@ -268,18 +311,20 @@ public class AdminMenuGameTests {
 		PlayerRecord restricted = PlayerRecord.DEFAULT.withMode(HARD).withAllowed(EnumSet.of(HARD, ELITE), null, now);
 		List<Scenario> scenarios = new ArrayList<>();
 		for (PersonalDifficultyMode m : PersonalDifficultyMode.values()) {
-			scenarios.add(new Scenario("assign " + m, hard, new int[] {18 + m.ordinal()}, "assign %s " + m.commandName()));
-			scenarios.add(new Scenario("assign+lock " + m, hard, new int[] {27 + m.ordinal()}, "assign %s " + m.commandName() + " lock"));
+			scenarios.add(new Scenario("assign " + m, hard, new int[] {set(m)}, "assign %s " + m.commandName()));
+			// the menu no longer has a combined "assign and lock" button; assigning a locked player keeps the lock, like the command
+			scenarios.add(new Scenario("assign while locked " + m, lockedElite, new int[] {set(m)}, "assign %s " + m.commandName()));
 		}
-		scenarios.add(new Scenario("assign same mode", hard, new int[] {18 + HARD.ordinal()}, "assign %s hard"));
-		scenarios.add(new Scenario("lock", hard, new int[] {36}, "lock %s"));
-		scenarios.add(new Scenario("unlock", lockedElite, new int[] {36}, "unlock %s"));
-		scenarios.add(new Scenario("unrestrict", restricted, new int[] {40}, "unrestrict %s"));
-		scenarios.add(new Scenario("unrestrict none", hard, new int[] {40}, "unrestrict %s"));
-		scenarios.add(new Scenario("reset", lockedElite, new int[] {42}, "reset %s"));
-		scenarios.add(new Scenario("reset nothing stored", PlayerRecord.DEFAULT, new int[] {42}, "reset %s"));
-		scenarios.add(new Scenario("restrict within current", hard, new int[] {38, 11 + HARD.ordinal(), 11 + ELITE.ordinal(), 29}, "restrict %s hard,elite"));
-		scenarios.add(new Scenario("restrict same list", restricted, new int[] {38, 29}, "restrict %s hard,elite"));
+		scenarios.add(new Scenario("assign same mode", hard, new int[] {set(HARD)}, "assign %s hard"));
+		scenarios.add(new Scenario("lock", hard, new int[] {LOCK}, "lock %s"));
+		scenarios.add(new Scenario("unlock", lockedElite, new int[] {LOCK}, "unlock %s"));
+		scenarios.add(new Scenario("unrestrict", restricted, new int[] {ALLOW_ALL}, "unrestrict %s"));
+		scenarios.add(new Scenario("unrestrict none", hard, new int[] {ALLOW_ALL}, "unrestrict %s"));
+		scenarios.add(new Scenario("reset", lockedElite, new int[] {RESET, CONFIRM_LEFT}, "reset %s"));
+		scenarios.add(new Scenario("reset nothing stored", PlayerRecord.DEFAULT, new int[] {RESET, CONFIRM_LEFT}, "reset %s"));
+		int[] withinCurrent = java.util.stream.IntStream.concat(java.util.Arrays.stream(untickAllBut(HARD, ELITE)), java.util.stream.IntStream.of(SAVE)).toArray();
+		scenarios.add(new Scenario("restrict within current", hard, withinCurrent, "restrict %s hard,elite"));
+		scenarios.add(new Scenario("restrict same list", restricted, new int[] {SAVE}, "restrict %s hard,elite"));
 		try {
 			int index = 0;
 			for (Scenario s : scenarios) {
@@ -317,16 +362,17 @@ public class AdminMenuGameTests {
 		try {
 			Recorder feedback = open(admin);
 			selectPlayer(admin, "0am_once_t");
-			click(admin, 18 + HARD.ordinal());
+			click(admin, set(HARD));
 			check(feedback.messages.size() == 1 && feedback.broadcasts == 1, "one message, broadcast to operators: " + feedback.messages + " " + feedback.broadcasts);
-			click(admin, 18 + HARD.ordinal());
+			click(admin, set(HARD));
 			check(feedback.messages.size() == 2 && feedback.broadcasts == 1, "'nothing changed' is reported but not broadcast: " + feedback.messages);
-			click(admin, 36);
+			click(admin, LOCK);
 			check(feedback.messages.size() == 3 && feedback.broadcasts == 2, "lock: " + feedback.messages);
 			check(rec(target).locked(), "locked");
-			// an empty allow-list is refused once, with the same text as the command
-			click(admin, 38);
-			click(admin, 29);
+			check(label(admin, LOCK).equals("Lock: ON"), "the lock button shows its state: " + label(admin, LOCK));
+			// an empty allow-list is refused once
+			clickAll(admin, untickAllBut());
+			click(admin, SAVE);
 			check(feedback.messages.size() == 4 && feedback.messages.get(3).contains("allow-list cannot be empty"), "empty list refused once: " + feedback.messages);
 			check(rec(target).allowed() == null, "nothing stored");
 		} finally {
@@ -349,11 +395,9 @@ public class AdminMenuGameTests {
 				admin.closeContainer();
 				open(admin);
 				selectPlayer(admin, t.getGameProfile().name());
-				click(admin, 38);
-				click(admin, 11 + HARD.ordinal());
-				click(admin, 11 + ELITE.ordinal());
-				click(admin, 29);
-				check(label(admin, 20).equals("Switch"), "asked: " + label(admin, 20));
+				clickAll(admin, untickAllBut(HARD, ELITE));
+				click(admin, SAVE);
+				check(label(admin, CONFIRM_LEFT).startsWith("Switch"), "asked: " + label(admin, 20));
 				check(rec(t).allowed() == null && rec(t).mode() == NORMAL, "nothing stored while asking");
 				click(admin, 4); // not a button
 				click(admin, 21); // not a button
@@ -368,9 +412,9 @@ public class AdminMenuGameTests {
 						check(rec(t).mode() == NORMAL && rec(t).allowed().equals(EnumSet.of(HARD, ELITE)) && rec(t).isException(), "Keep: stays on NORMAL as an exception: " + rec(t));
 					}
 					default -> {
-						click(admin, 24);
+						click(admin, CONFIRM_RIGHT);
 						check(rec(t).mode() == NORMAL && rec(t).allowed() == null && !rec(t).locked(), "Cancel: nothing changed: " + rec(t));
-						check(label(admin, 29).equals("Apply allow-list"), "back in the editor");
+						check(label(admin, SAVE).equals("Save allowed list"), "back on the player page");
 					}
 				}
 			}
@@ -399,7 +443,7 @@ public class AdminMenuGameTests {
 			try {
 				check(rt().settings().isQuarantined(target.getUUID()), "quarantined");
 				open(admin);
-				click(admin, 20);
+				click(admin, HUB_PLAYERS);
 				boolean listedAsInvalid = false;
 				for (int pageNo = 0; pageNo < 60 && !listedAsInvalid; pageNo++) {
 					for (int slot = 0; slot < 45; slot++) {
@@ -411,17 +455,17 @@ public class AdminMenuGameTests {
 						}
 					}
 					if (!listedAsInvalid) {
-						click(admin, 53);
+						click(admin, NEXT);
 					}
 				}
 				check(listedAsInvalid, "found in the list");
 				check(label(admin, 22).equals("Repair invalid record"), "only the repair is offered: " + label(admin, 22));
-				for (int slot : new int[] {18, 19, 20, 21, 27, 28, 29, 30, 31, 36, 38, 40, 42}) {
+				for (int slot : new int[] {18, 20, 21, 23, 24, 27, 29, 30, 31, 32, 33, 35, 38, 40, 42}) {
 					check(label(admin, slot).isEmpty(), "no ordinary action is offered in slot " + slot + ": " + label(admin, slot));
 				}
 				String before = Files.readString(file);
 				for (int slot = 0; slot < 54; slot++) {
-					if (slot != 22 && slot != 45) {
+					if (slot != REPAIR && slot != BACK && slot != CLOSE) {
 						click(admin, slot);
 						admin.containerMenu.clicked(slot, 1, ContainerInput.PICKUP, admin);
 					}
@@ -465,21 +509,24 @@ public class AdminMenuGameTests {
 		ServerPlayer admin = op(h, "0am_pol_op");
 		try {
 			Recorder feedback = open(admin);
-			click(admin, 24);
-			check(label(admin, 11 + HARD.ordinal()).equals("HARD: ENABLED"), "shown: " + label(admin, 11 + HARD.ordinal()));
-			click(admin, 11 + HARD.ordinal());
-			check(!rt().availability().isEnabled(HARD) && label(admin, 11 + HARD.ordinal()).equals("HARD: DISABLED"), "disabled and re-rendered");
-			click(admin, 11 + HARD.ordinal());
+			click(admin, HUB_DIFFICULTIES);
+			for (PersonalDifficultyMode m : PersonalDifficultyMode.values()) {
+				check(label(admin, policy(m)).startsWith(m.name().charAt(0) + m.name().substring(1).toLowerCase(java.util.Locale.ROOT) + ":"), "difficulties in order: " + label(admin, policy(m)));
+			}
+			check(label(admin, policy(HARD)).equals("Hard: ON"), "shown: " + label(admin, policy(HARD)));
+			click(admin, policy(HARD));
+			check(!rt().availability().isEnabled(HARD) && label(admin, policy(HARD)).equals("Hard: OFF"), "disabled and re-rendered");
+			click(admin, policy(HARD));
 			check(rt().availability().isEnabled(HARD), "toggles back");
 			for (PersonalDifficultyMode m : List.of(EASY, HARD, ELITE, PEACEFUL)) {
-				click(admin, 11 + m.ordinal());
+				click(admin, policy(m));
 			}
 			check(rt().availability().enabledModes().equals(List.of(NORMAL)), "only NORMAL left: " + rt().availability().enabledModes());
 			int messages = feedback.messages.size();
-			click(admin, 11 + NORMAL.ordinal());
+			click(admin, policy(NORMAL));
 			check(rt().availability().isEnabled(NORMAL) && feedback.messages.size() == messages + 1 && feedback.messages.get(messages).contains("last enabled difficulty"),
 				"the last difficulty cannot be disabled: " + feedback.messages.get(feedback.messages.size() - 1));
-			click(admin, 22);
+			click(admin, ENABLE_ALL);
 			check(rt().availability().enabledModes().size() == 5, "enable all");
 		} finally {
 			try {
@@ -493,35 +540,25 @@ public class AdminMenuGameTests {
 	}
 
 	@GameTest
-	public void admin_allowListEditor_fromThePermissionsPage_editsAndRemovesTheList(GameTestHelper h) {
+	public void admin_allowedList_onThePlayerPage_isSavedOnlyBySave_andAllowAllRemovesIt(GameTestHelper h) {
 		ServerPlayer admin = op(h, "0am_ale_op");
 		ServerPlayer target = mock(h, "0am_ale_t", HARD);
 		try {
 			open(admin);
-			click(admin, 24);
-			click(admin, 31); // per-player allow-lists: choose a player
-			boolean found = false;
-			for (int pageNo = 0; pageNo < 60 && !found; pageNo++) {
-				for (int slot = 0; slot < 45; slot++) {
-					if (label(admin, slot).equals("0am_ale_t")) {
-						click(admin, slot);
-						found = true;
-						break;
-					}
-				}
-				if (!found) {
-					click(admin, 53);
-				}
+			selectPlayer(admin, "0am_ale_t");
+			for (PersonalDifficultyMode m : PersonalDifficultyMode.values()) {
+				check(label(admin, allow(m)).endsWith(": allowed"), "with no stored list every box starts ticked: " + label(admin, allow(m)));
 			}
-			check(found && label(admin, 29).equals("Apply allow-list"), "the editor is shown");
-			click(admin, 11 + HARD.ordinal());
-			click(admin, 11 + PEACEFUL.ordinal());
-			check(label(admin, 11 + HARD.ordinal()).startsWith("[x]"), "ticked");
-			click(admin, 29);
-			check(rec(target).allowed().equals(EnumSet.of(HARD, PEACEFUL)) && rec(target).mode() == HARD, "applied without a question (the current mode is listed): " + rec(target));
-			click(admin, 38);
-			click(admin, 31);
+			clickAll(admin, untickAllBut(HARD, PEACEFUL));
+			check(label(admin, allow(EASY)).endsWith(": not allowed") && label(admin, allow(HARD)).endsWith(": allowed"), "ticks are shown");
+			check(rec(target).allowed() == null, "nothing is stored until Save");
+			click(admin, SAVE);
+			check(rec(target).allowed().equals(EnumSet.of(HARD, PEACEFUL)) && rec(target).mode() == HARD, "saved without a question (the current mode is listed): " + rec(target));
+			click(admin, ALLOW_ALL);
 			check(rec(target).allowed() == null, "removed");
+			check(label(admin, allow(EASY)).endsWith(": allowed"), "and the boxes are all ticked again");
+			click(admin, SAVE);
+			check(rec(target).allowed() == null, "saving an untouched all-ticked list does not create a list");
 		} finally {
 			finish();
 		}
@@ -541,12 +578,21 @@ public class AdminMenuGameTests {
 			List<Runnable> screens = List.of(
 				() -> {
 				},
-				() -> click(admin, 20),
+				() -> click(admin, HUB_PLAYERS),
 				() -> pickFromCurrentList(admin, "0am_host_t"),
-				() -> click(admin, 38),
 				() -> {
-					click(admin, 11 + HARD.ordinal());
-					click(admin, 29);
+					clickAll(admin, untickAllBut(EASY));
+					click(admin, SAVE); // HARD is not in {EASY}: the Switch / Keep / Cancel screen
+				},
+				() -> {
+					click(admin, CONFIRM_RIGHT); // back to the player page
+					click(admin, RESET); // the reset confirmation
+				},
+				() -> {
+					click(admin, CONFIRM_RIGHT);
+					click(admin, BACK);
+					click(admin, BACK);
+					click(admin, HUB_DIFFICULTIES);
 				});
 			int[] extraSlots = {-1000, -1, 54, 55, 80, 1000, Integer.MAX_VALUE, Integer.MIN_VALUE};
 			int[] buttons = {-1, 0, 1, 2, 3, 8, 9, 40, 41, 127, 255, Integer.MAX_VALUE, Integer.MIN_VALUE};
@@ -589,7 +635,7 @@ public class AdminMenuGameTests {
 					return;
 				}
 			}
-			click(admin, 53);
+			click(admin, NEXT);
 		}
 		throw new AssertionError(name + " not listed");
 	}
@@ -630,20 +676,23 @@ public class AdminMenuGameTests {
 			putId(ghost, PlayerRecord.DEFAULT.withMode(ELITE));
 			int explicit = rt().settings().explicitCount();
 			open(admin);
-			click(admin, 20);
+			click(admin, HUB_PLAYERS);
 			String ghostLabel = ghost.toString();
 			boolean found = false;
 			for (int pageNo = 0; pageNo < 80 && !found; pageNo++) {
 				for (int slot = 0; slot < 45; slot++) {
 					if (label(admin, slot).equals(ghostLabel)) {
 						found = true;
-						check(admin.containerMenu.getSlot(slot).getItem().getItem() == net.minecraft.world.item.Items.NETHERITE_INGOT, "an offline player with a stored ELITE record is shown by mode");
+						ItemStack head = admin.containerMenu.getSlot(slot).getItem();
+						check(head.getItem() == net.minecraft.world.item.Items.PLAYER_HEAD, "an offline player is shown as a player head");
+						var lore = head.get(net.minecraft.core.component.DataComponents.LORE);
+						check(lore != null && lore.lines().stream().anyMatch(c -> c.getString().equals("Difficulty: Elite")), "with their stored difficulty in the tooltip: " + lore);
 						click(admin, slot);
 						break;
 					}
 				}
 				if (!found) {
-					click(admin, 53);
+					click(admin, NEXT);
 				}
 			}
 			check(found, "an offline player known only from the settings file (name unknown) is listed by UUID");
@@ -723,13 +772,13 @@ public class AdminMenuGameTests {
 		MinecraftServer server = h.getLevel().getServer();
 		ServerPlayer admin = op(h, "0am_pcmp_op");
 		List<PolicyCase> cases = List.of(
-			new PolicyCase("disable HARD", List.of(), "disable hard", 11 + HARD.ordinal()),
-			new PolicyCase("disable ELITE", List.of(), "disable elite", 11 + ELITE.ordinal()),
-			new PolicyCase("enable HARD", List.of(HARD), "enable hard", 11 + HARD.ordinal()),
-			new PolicyCase("enable PEACEFUL", List.of(PEACEFUL, EASY), "enable peaceful", 11 + PEACEFUL.ordinal()),
-			new PolicyCase("disable the last enabled difficulty is refused", List.of(EASY, HARD, ELITE, PEACEFUL), "disable normal", 11 + NORMAL.ordinal()),
-			new PolicyCase("enable all (changes something)", List.of(EASY), "enable all", 22),
-			new PolicyCase("enable all (nothing to change)", List.of(), "enable all", 22));
+			new PolicyCase("disable HARD", List.of(), "disable hard", policy(HARD)),
+			new PolicyCase("disable ELITE", List.of(), "disable elite", policy(ELITE)),
+			new PolicyCase("enable HARD", List.of(HARD), "enable hard", policy(HARD)),
+			new PolicyCase("enable PEACEFUL", List.of(PEACEFUL, EASY), "enable peaceful", policy(PEACEFUL)),
+			new PolicyCase("disable the last enabled difficulty is refused", List.of(EASY, HARD, ELITE, PEACEFUL), "disable normal", policy(NORMAL)),
+			new PolicyCase("enable all (changes something)", List.of(EASY), "enable all", ENABLE_ALL),
+			new PolicyCase("enable all (nothing to change)", List.of(), "enable all", ENABLE_ALL));
 		try {
 			for (PolicyCase c : cases) {
 				setPolicy(c.disabledAtStart());
@@ -740,7 +789,7 @@ public class AdminMenuGameTests {
 				setPolicy(c.disabledAtStart());
 				admin.closeContainer();
 				Recorder feedback = open(admin);
-				click(admin, 24); // Difficulty Permissions
+				click(admin, HUB_DIFFICULTIES);
 				click(admin, c.menuSlot());
 				List<PersonalDifficultyMode> viaMenu = List.copyOf(rt().availability().enabledModes());
 
@@ -769,7 +818,7 @@ public class AdminMenuGameTests {
 		MinecraftServer server = h.getLevel().getServer();
 		ServerPlayer admin = op(h, "0am_rcmp_op");
 		try {
-			String[][] flows = {{"switch", "20"}, {"keep", "22"}};
+			String[][] flows = {{"switch", String.valueOf(CONFIRM_LEFT)}, {"keep", String.valueOf(CONFIRM_MIDDLE)}};
 			int i = 0;
 			for (String[] flow : flows) {
 				String cmdName = "0am_rcmp_c" + i;
@@ -783,11 +832,9 @@ public class AdminMenuGameTests {
 				admin.closeContainer();
 				Recorder feedback = open(admin);
 				selectPlayer(admin, menuName);
-				click(admin, 38); // allow-list editor
-				click(admin, 11 + HARD.ordinal());
-				click(admin, 11 + ELITE.ordinal());
-				click(admin, 29); // apply: NORMAL is not in the list, so the administrator is asked
-				check(label(admin, 20).equals("Switch"), flow[0] + ": asked");
+				clickAll(admin, untickAllBut(HARD, ELITE));
+				click(admin, SAVE); // NORMAL is not in the list, so the administrator is asked
+				check(label(admin, CONFIRM_LEFT).startsWith("Switch"), flow[0] + ": asked");
 				check(feedback.messages.isEmpty() && rec(viaMenu).sameState(start), flow[0] + ": nothing reported and nothing stored while asking: " + feedback.messages);
 				click(admin, Integer.parseInt(flow[1]));
 
@@ -803,11 +850,9 @@ public class AdminMenuGameTests {
 			admin.closeContainer();
 			Recorder feedback = open(admin);
 			selectPlayer(admin, "0am_rcmp_cancel");
-			click(admin, 38);
-			click(admin, 11 + HARD.ordinal());
-			click(admin, 11 + ELITE.ordinal());
-			click(admin, 29);
-			click(admin, 24); // Cancel
+			clickAll(admin, untickAllBut(HARD, ELITE));
+			click(admin, SAVE);
+			click(admin, CONFIRM_RIGHT); // Cancel
 			check(rec(cancelled).sameState(start) && rec(cancelled).allowed() == null, "Cancel: the record is untouched");
 			check(feedback.messages.isEmpty(), "Cancel: no change is reported: " + feedback.messages);
 			ServerPlayer refused = mock(h, "0am_rcmp_nochoice", NORMAL);

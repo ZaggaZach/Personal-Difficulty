@@ -22,9 +22,17 @@
     there is another page).
 * The empty allow-list message in the menu now points to the *Allow all* button instead of a command.
 
+### Tests
+* `AdminMenuGameTests` rewritten for the new layout (player heads, one player page, reset confirmation, Save/Allow all, Lock ON/OFF,
+  Server Difficulties ON/OFF); the admin transcript golden file and `PlayerPolicyGameTests` updated for the new order (the only
+  differences are list order; `switch` still moves players to NORMAL).
+* Saving an unchanged stored allow-list from the menu now goes through the service like the command ("already restricted; nothing
+  changed"), so menu and command messages stay identical.
+
 ### Known gaps
-* `AdminMenuGameTests`, the admin transcript golden file and `AdminGuiE2eTest` still describe the rc.1 slot layout and must be
-  updated before they are run again (they are not part of `./gradlew build`).
+* `AdminGuiE2eTest` (headless protocol client, `./gradlew e2eTest`, not part of `build`) still uses the rc.1 slot layout.
+* `EliteHuntGameTests.ai_priority_creeper` failed once on its no-Elite control case by a few ticks (56 of 60); it involves no
+  changed code and is timing-sensitive.
 
 ## 1.3.1-rc.1: UNPUBLISHED release candidate (Phases 1-3 of the 1.4.0 line: per-player control, settings overrides, admin menu)
 

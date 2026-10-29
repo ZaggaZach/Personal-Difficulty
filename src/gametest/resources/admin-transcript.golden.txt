@@ -41,7 +41,7 @@
   | pd_gold_a is now PEACEFUL.
 > assign pd_gold_a bogus
   result=0 error=null
-  | Unknown difficulty 'bogus'. Known: normal, easy, hard, elite, peaceful.
+  | Unknown difficulty 'bogus'. Known: peaceful, easy, normal, hard, elite.
 > assign pd_gold_a Hard
   result=1 error=null
   | pd_gold_a is now HARD.
@@ -62,19 +62,19 @@
   |   last administrative change: 00000000-0000-0000-0000-0000000000e5 at <time>
 > restrict pd_gold_a normal,easy
   result=0 error=null
-  | Refused: pd_gold_a is on HARD, which is not in the new list (normal, easy). Nothing changed. Re-run with 'switch' (moves them to NORMAL) or 'keep' (they stay on HARD as an exception outside the list).
+  | Refused: pd_gold_a is on HARD, which is not in the new list (easy, normal). Nothing changed. Re-run with 'switch' (moves them to NORMAL) or 'keep' (they stay on HARD as an exception outside the list).
 > restrict pd_gold_a normal,easy switch
   result=1 error=null
-  | pd_gold_a is now restricted to normal, easy. They were moved to NORMAL.
+  | pd_gold_a is now restricted to easy, normal. They were moved to NORMAL.
 > status pd_gold_a
   result=1 error=null
   | pd_gold_a (00000000-0000-0000-0000-0000000000a1): NORMAL
   |   locked: no
-  |   allow-list: normal, easy
+  |   allow-list: easy, normal
   |   last administrative change: console/command block at <time>
 > restrict pd_gold_a normal,easy
   result=0 error=null
-  | pd_gold_a is already restricted to normal, easy; nothing changed.
+  | pd_gold_a is already restricted to easy, normal; nothing changed.
 > restrict pd_gold_c hard,elite keep
   result=1 error=null
   | pd_gold_c is now restricted to hard, elite. They stay on NORMAL as an exception outside the list; once they switch away they cannot switch back.
@@ -92,7 +92,7 @@
   | Refused: pd_gold_c is on NORMAL, which is not in the new list (hard). Nothing changed. Re-run with 'switch' (moves them to HARD) or 'keep' (they stay on NORMAL as an exception outside the list).
 > restrict pd_gold_c hard,bogus
   result=0 error=null
-  | Unknown difficulty 'bogus'. Known: normal, easy, hard, elite, peaceful.
+  | Unknown difficulty 'bogus'. Known: peaceful, easy, normal, hard, elite.
 > restrict pd_gold_c ,
   result=0 error=null
   | An allow-list cannot be empty. Use 'admin unrestrict <player>' to remove a restriction.
@@ -150,12 +150,12 @@
 > difficulties
   result=1 error=null
   | Difficulty availability (a restriction only blocks NEW selections; saved selections are never changed):
-  |   normal: ENABLED
+  |   peaceful: ENABLED
   |   easy: ENABLED
+  |   normal: ENABLED
   |   hard: ENABLED
   |   elite: ENABLED
-  |   peaceful: ENABLED
-  | Players can select: normal, easy, hard, elite, peaceful
+  | Players can select: peaceful, easy, normal, hard, elite
 > disable hard
   result=1 error=null
   | HARD is now DISABLED. Players cannot newly select it; the <n> saved selection(s) using it are kept, and those players keep playing on it until they switch away.
@@ -165,12 +165,12 @@
 > difficulties
   result=1 error=null
   | Difficulty availability (a restriction only blocks NEW selections; saved selections are never changed):
-  |   normal: ENABLED
+  |   peaceful: ENABLED
   |   easy: ENABLED
+  |   normal: ENABLED
   |   hard: DISABLED (<n> player(s) still use it; kept)
   |   elite: ENABLED
-  |   peaceful: ENABLED
-  | Players can select: normal, easy, elite, peaceful
+  | Players can select: peaceful, easy, normal, elite
 > disable easy
   result=1 error=null
   | EASY is now DISABLED. Players cannot newly select it; the <n> saved selection(s) using it are kept, and those players keep playing on it until they switch away.
@@ -186,11 +186,11 @@
 > difficulties
   result=1 error=null
   | Difficulty availability (a restriction only blocks NEW selections; saved selections are never changed):
-  |   normal: ENABLED
+  |   peaceful: DISABLED (<n> player(s) still use it; kept)
   |   easy: DISABLED (<n> player(s) still use it; kept)
+  |   normal: ENABLED
   |   hard: DISABLED (<n> player(s) still use it; kept)
   |   elite: DISABLED (<n> player(s) still use it; kept)
-  |   peaceful: DISABLED (<n> player(s) still use it; kept)
   | Players can select: normal
 > enable hard
   result=1 error=null
@@ -200,25 +200,25 @@
   | HARD is already enabled; nothing changed.
 > enable bogus
   result=0 error=null
-  | Unknown difficulty 'bogus'. Known: normal, easy, hard, elite, peaceful, all.
+  | Unknown difficulty 'bogus'. Known: peaceful, easy, normal, hard, elite, all.
 > disable bogus
   result=0 error=null
-  | Unknown difficulty 'bogus'. Known: normal, easy, hard, elite, peaceful.
+  | Unknown difficulty 'bogus'. Known: peaceful, easy, normal, hard, elite.
 > enable all
   result=1 error=null
-  | All difficulties are enabled again. Players can select: normal, easy, hard, elite, peaceful.
+  | All difficulties are enabled again. Players can select: peaceful, easy, normal, hard, elite.
 > enable all
   result=1 error=null
   | Every difficulty is already enabled; nothing changed.
 > difficulties
   result=1 error=null
   | Difficulty availability (a restriction only blocks NEW selections; saved selections are never changed):
-  |   normal: ENABLED
+  |   peaceful: ENABLED
   |   easy: ENABLED
+  |   normal: ENABLED
   |   hard: ENABLED
   |   elite: ENABLED
-  |   peaceful: ENABLED
-  | Players can select: normal, easy, hard, elite, peaceful
+  | Players can select: peaceful, easy, normal, hard, elite
 > status pd_gold_c
   result=1 error=null
   | pd_gold_c (00000000-0000-0000-0000-0000000000c3): INVALID STORED RECORD, kept verbatim in players.json and NOT trusted
