@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
+import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -20,6 +21,8 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * Phase 5 performance measurement (plan section 8): server tick time with 200 hostile mobs and 5 players, with no Elite player
@@ -85,6 +88,7 @@ public class PerformanceGameTests {
 		}
 		MinecraftServer server = h.getLevel().getServer();
 		Arena a = new Arena(h, 94);
+		border(a);
 		List<Mob> mobs = new ArrayList<>();
 		for (int i = 0; i < ZOMBIES + SKELETONS; i++) {
 			double x = 6 + (i % 20) * 5.5;
@@ -158,6 +162,24 @@ public class PerformanceGameTests {
 			}
 			h.succeed();
 		});
+	}
+
+	/**
+	 * A wall round the platform's edge. The platform floats; in the first run (rc.3 build) 112 of the 200 mobs were pushed or
+	 * knocked off its open edges by the crowd and the skeletons' arrows, so later windows measured fewer mobs than earlier ones.
+	 */
+	private static void border(Arena a) {
+		BlockState stone = Blocks.STONE.defaultBlockState();
+		for (int dy = 1; dy <= 4; dy++) {
+			for (int x = -4; x <= 120; x++) {
+				a.level.setBlock(new BlockPos(a.x0 + x, a.y + dy, a.z0 - 4), stone, 18);
+				a.level.setBlock(new BlockPos(a.x0 + x, a.y + dy, a.z0 + 100), stone, 18);
+			}
+			for (int z = -4; z <= 100; z++) {
+				a.level.setBlock(new BlockPos(a.x0 - 4, a.y + dy, a.z0 + z), stone, 18);
+				a.level.setBlock(new BlockPos(a.x0 + 120, a.y + dy, a.z0 + z), stone, 18);
+			}
+		}
 	}
 
 	private static double mean(List<Long> v) {
