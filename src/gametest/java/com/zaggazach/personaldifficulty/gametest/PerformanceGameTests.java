@@ -181,21 +181,28 @@ public class PerformanceGameTests {
 		});
 	}
 
-	// ------------------------------------------------------------------ worst case for the larger path-search budget
+	// ------------------------------------------------------------------ worst case: hunting a player who cannot be reached
 
 	private static final String PERF_UNREACHABLE = "personaldifficulty-gametest:elite_perf_unreachable";
 	private static final int HUNTERS = 30;
 
 	/**
-	 * Worst case for Elite path searches: every search for an UNREACHABLE target uses the whole node budget, every time the mob
-	 * re-plans. With a 9x budget (tried for plan 6.2) this measured +7.73 ms (p95 25 ms) and was removed; it now measures the
-	 * vanilla budget with the 3x search length. {@value #HUNTERS} zombies 44-58 blocks from a player standing on top of an
-	 * 8-block stone pillar (visible, never reachable). Windows alternate: the player Normal (beyond the zombies' vanilla range,
-	 * so nobody hunts: the baseline) and the player Elite (all of them hunt, with the large budget, and fail). Opt-in like the
-	 * main measurement; it fails only if the scenario broke (the zombies did not hunt the Elite player).
+	 * Worst case for Elite path searches: every search for an UNREACHABLE target fails after using its whole node budget, every
+	 * time the mob re-plans. {@value #HUNTERS} zombies around a player standing on top of an 8-block stone pillar (visible, never
+	 * reachable). (A 9x node budget, tried for plan 6.2, measured +7.73 ms here and was removed.)
+	 *
+	 * <p>Two parts, windows alternating Normal / Elite in each:
+	 * <ul>
+	 * <li><b>far</b> (44-58 blocks): beyond vanilla range, so a Normal player is hunted by nobody and an Elite player by all. The
+	 * difference is the cost of the FEATURE (more mobs hunting), not of any inefficiency.</li>
+	 * <li><b>near</b> (18-26 blocks): inside vanilla range, so the zombies hunt the player either way (and fail either way). The
+	 * difference is what the mod adds to a hunt that vanilla also does (the 3x search length, the Elite hooks). This one is judged
+	 * against the 1 ms budget.</li>
+	 * </ul>
+	 * Opt-in like the main measurement; it fails only if the scenario broke (nobody hunted).
 	 */
-	@GameTest(environment = PERF_UNREACHABLE, maxTicks = WARMUP + 6 * WINDOW + 100)
-	public void perf_unreachableElitePlayer_30HuntersThatCanNeverReachThem(GameTestHelper h) {
+	@GameTest(environment = PERF_UNREACHABLE, maxTicks = WARMUP + 9 * WINDOW + 100)
+	public void perf_unreachablePlayer_30HuntersThatCanNeverReachThem(GameTestHelper h) {
 		if (!Boolean.getBoolean("pd.perf")) {
 			h.succeed();
 			return;
@@ -210,18 +217,15 @@ public class PerformanceGameTests {
 		}
 		List<Mob> mobs = new ArrayList<>();
 		for (int i = 0; i < HUNTERS; i++) {
-			double angle = Math.PI * 0.6 + Math.PI * 0.8 * i / (HUNTERS - 1); // an arc on the far side, 50-60 blocks from the pillar
-			double dist = 52 + (i % 3) * 3;
-			Mob m = a.spawn(EntityTypes.ZOMBIE, px + Math.cos(angle) * dist, pz + Math.sin(angle) * dist * 0.85); // 44+ blocks: beyond vanilla range
-			mobs.add(m);
+			double[] at = ring(i, 52 + (i % 3) * 3, 0.85, px, pz); // 44+ blocks: beyond vanilla range
+			mobs.add(a.spawn(EntityTypes.ZOMBIE, at[0], at[1]));
 		}
 		ServerPlayer p = a.player(h, "pd_perf_pillar", PersonalDifficultyMode.NORMAL, px, pz);
-		p.snapTo(a.x0 + px + 0.5, a.y + 9, a.z0 + pz + 0.5);
 		p.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 100000, 4, false, false));
-		List<Long> normal = new ArrayList<>();
-		List<Long> elite = new ArrayList<>();
-		int[] huntingSamples = {0};
-		int[] eliteSamples = {0};
+		// [part 0 = far, 1 = near][0 = Normal, 1 = Elite]
+		List<List<List<Long>>> samples = List.of(List.of(new ArrayList<>(), new ArrayList<>()), List.of(new ArrayList<>(), new ArrayList<>()));
+		int[][] hunting = new int[2][2];
+		int[][] counted = new int[2][2];
 		long start = h.getTick();
 		everyTick(h, () -> {
 			tickPlayer(p);
@@ -233,41 +237,71 @@ public class PerformanceGameTests {
 			}
 			int window = (int) ((t - WARMUP) / WINDOW);
 			long inPhase = (t - WARMUP) % WINDOW;
-			if (window >= 6) {
+			if (window >= 9) {
 				return;
 			}
-			boolean eliteWindow = window % 2 == 1;
+			// windows 0-3 far (N E N E), window 4 moves the crowd in (not measured), windows 5-8 near (N E N E)
+			if (window == 4) {
+				if (inPhase == 0) {
+					setMode(p, PersonalDifficultyMode.NORMAL);
+					for (int i = 0; i < mobs.size(); i++) {
+						Mob m = mobs.get(i);
+						m.setTarget(null);
+						m.getNavigation().stop();
+						double[] at = ring(i, 18 + (i % 3) * 4, 1.0, px, pz);
+						m.snapTo(a.x0 + at[0], a.y + 1, a.z0 + at[1]);
+					}
+				}
+				return;
+			}
+			int part = window < 4 ? 0 : 1;
+			int lane = (window < 4 ? window : window - 5) % 2;
 			if (inPhase == 0) {
-				setMode(p, eliteWindow ? PersonalDifficultyMode.ELITE : PersonalDifficultyMode.NORMAL);
+				setMode(p, lane == 1 ? PersonalDifficultyMode.ELITE : PersonalDifficultyMode.NORMAL);
 			}
 			if (inPhase >= SETTLE) {
 				long[] times = server.getTickTimesNanos();
-				(eliteWindow ? elite : normal).add(times[(server.getTickCount() + times.length - 1) % times.length]);
-				if (eliteWindow) {
-					eliteSamples[0]++;
-					huntingSamples[0] += (int) mobs.stream().filter(m -> m.isAlive() && m.getTarget() == p).count();
-				}
+				samples.get(part).get(lane).add(times[(server.getTickCount() + times.length - 1) % times.length]);
+				counted[part][lane]++;
+				hunting[part][lane] += (int) mobs.stream().filter(m -> m.isAlive() && m.getTarget() == p).count();
 			}
 		});
-		at(h, WARMUP + 6L * WINDOW + 20, () -> {
+		at(h, WARMUP + 9L * WINDOW + 20, () -> {
 			try {
-				double meanNormal = mean(normal);
-				double meanElite = mean(elite);
-				double hunting = eliteSamples[0] == 0 ? 0 : huntingSamples[0] / (double) eliteSamples[0];
-				System.out.println(String.format(Locale.ROOT,
-					"PERF-UNREACHABLE %d zombies, player on an 8-block pillar 44-58 blocks away; average hunting in Elite windows %.1f%n"
-						+ "PERF-UNREACHABLE player Normal (nobody hunts)   mean %6.2f ms  sd %5.2f  p95 %6.2f  (n=%d)%n"
-						+ "PERF-UNREACHABLE player Elite (all hunt, fail)  mean %6.2f ms  sd %5.2f  p95 %6.2f  (n=%d)  difference %+6.2f ms (%+.3f ms per hunting zombie)%n"
-						+ "PERF-UNREACHABLE target (plan): at most +1.00 ms -> %s",
-					HUNTERS, hunting, meanNormal / 1e6, sd(normal, meanNormal) / 1e6, p95(normal) / 1e6, normal.size(),
-					meanElite / 1e6, sd(elite, meanElite) / 1e6, p95(elite) / 1e6, elite.size(), (meanElite - meanNormal) / 1e6,
-					hunting == 0 ? 0 : (meanElite - meanNormal) / 1e6 / hunting, (meanElite - meanNormal) / 1e6 <= 1.0 ? "WITHIN TARGET" : "OVER TARGET"));
-				check(hunting > HUNTERS / 2.0, "premise: the zombies hunted the Elite player (" + hunting + " on average)");
+				StringBuilder out = new StringBuilder();
+				double nearDiff = 0;
+				for (int part = 0; part < 2; part++) {
+					String name = part == 0 ? "far 44-58 blocks" : "near 18-26 blocks";
+					double[] mean = new double[2];
+					for (int lane = 0; lane < 2; lane++) {
+						List<Long> v = samples.get(part).get(lane);
+						mean[lane] = mean(v);
+						out.append(String.format(Locale.ROOT, "PERF-UNREACHABLE %-17s player %-6s mean %6.2f ms  sd %5.2f  p95 %6.2f  (n=%d)  zombies hunting %.1f%n",
+							name, lane == 1 ? "Elite" : "Normal", mean[lane] / 1e6, sd(v, mean[lane]) / 1e6, p95(v) / 1e6, v.size(),
+							counted[part][lane] == 0 ? 0.0 : hunting[part][lane] / (double) counted[part][lane]));
+					}
+					double diff = (mean[1] - mean[0]) / 1e6;
+					out.append(String.format(Locale.ROOT, "PERF-UNREACHABLE %-17s difference %+6.2f ms%s%n", name, diff,
+						part == 0 ? " (the feature: Elite players are hunted from further away)" : " (what the mod adds to a hunt vanilla also does)"));
+					if (part == 1) {
+						nearDiff = diff;
+					}
+				}
+				out.append(String.format(Locale.ROOT, "PERF-UNREACHABLE target: the near difference at most +1.00 ms -> %s", nearDiff <= 1.0 ? "WITHIN TARGET" : "OVER TARGET"));
+				System.out.println(out);
+				double huntedFar = counted[0][1] == 0 ? 0 : hunting[0][1] / (double) counted[0][1];
+				check(huntedFar > HUNTERS / 2.0, "premise: the zombies hunted the far Elite player (" + huntedFar + " on average)");
 			} finally {
 				a.close();
 			}
 			h.succeed();
 		});
+	}
+
+	/** Position {@code i} of {@value #HUNTERS} on an arc on the far side of the pillar, {@code dist} out, z squeezed by {@code squeeze}. */
+	private static double[] ring(int i, double dist, double squeeze, int px, int pz) {
+		double angle = Math.PI * 0.6 + Math.PI * 0.8 * i / (HUNTERS - 1);
+		return new double[] {px + Math.cos(angle) * dist, pz + Math.sin(angle) * dist * squeeze};
 	}
 
 	/** Crowd member {@code i} at its fixed starting spot (zombies first, then skeletons). */

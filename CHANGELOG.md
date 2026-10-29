@@ -37,7 +37,7 @@
   routes (it is simply slow). Across a 75-block chasm it walks to the edge and stops (about 59 blocks short): the route search
   returns partial routes that end at the edge. Enlarging the search's node budget was tried and removed: 3x and 9x left the
   chasm result unchanged, and at 9x 30 zombies hunting an Elite player on an unreachable pillar cost +7.73 ms per tick (p95
-  25 ms; new opt-in measurement `perf_unreachableElitePlayer_30HuntersThatCanNeverReachThem`). The plan's waypoint hops would
+  25 ms; new opt-in measurement `perf_unreachablePlayer_30HuntersThatCanNeverReachThem`). The plan's waypoint hops would
   end at the same edge, so they were not built.
 * The live-AI tests written against the 1.3.0 numbers keep testing them exactly, in a test environment
   (`personaldifficulty-gametest:elite_13_ai`) that pins 1.25x, 2x and alerts off; a new test checks the new defaults live (a
