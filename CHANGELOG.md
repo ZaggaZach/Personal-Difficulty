@@ -5,7 +5,8 @@
 > **Status: a private checkpoint, NOT published.** Builds on `1.3.1-rc.3`.
 >
 > **Phase 5 build: PASSED (29 October 2026).** `./gradlew build -PpdPerf=true` green: unit tests and all 174 required
-> GameTests, both performance measurements within target. **In-game test: pending.**
+> GameTests, both performance measurements within target. **In-game test: PASSED (29 October 2026)** on the real
+> server with the new values set: long-range detection, alerts to the remembered point, giving up at a pillar, server load.
 
 ### Added
 * `elite.ai.absolute-range-cap` (default **128** blocks, 16 .. 256) replaces the fixed 64-block cap of 1.3.0.
