@@ -61,4 +61,66 @@ public class EliteDefaultsGameTests {
 			h.succeed();
 		});
 	}
+
+	// ------------------------------------------------------------------ plan 6.2: pursuit beyond the path-search budget
+
+	/**
+	 * MEASUREMENT for plan 6.2 (not required yet): does an Elite target at 2.8x the vanilla range get reached with the mod's
+	 * existing hooks (longer path length, held target), or are routes cut short so that a waypoint goal is needed?
+	 * Two arenas: open ground, and a chasm the zombie can see across but must walk around (about 160 blocks of route for 98
+	 * blocks of straight line). The target is set directly: this measures pursuit, not acquisition.
+	 */
+	@GameTest(maxTicks = 620, required = false)
+	public void ai_measure_longPursuit_openGroundAndAroundAChasm(GameTestHelper h) {
+		Arena open = new Arena(h, 97);
+		Arena chasm = new Arena(h, 98);
+		for (int x = 40; x <= 44; x++) { // a 5-wide gap in the floor from the edge to z = 70: too wide to jump, nothing blocks sight
+			for (int z = -4; z <= 70; z++) {
+				chasm.level.setBlock(new net.minecraft.core.BlockPos(chasm.x0 + x, chasm.y, chasm.z0 + z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 18);
+			}
+		}
+		Arena[] arenas = {open, chasm};
+		Mob[] mobs = new Mob[2];
+		ServerPlayer[] players = new ServerPlayer[2];
+		double[] start = new double[2];
+		double[] closest = {Double.MAX_VALUE, Double.MAX_VALUE};
+		int[] heldTicks = new int[2];
+		boolean[] reachesAtStart = new boolean[2];
+		int[] partialPlans = new int[2];
+		for (int i = 0; i < 2; i++) {
+			mobs[i] = arenas[i].spawn(EntityTypes.ZOMBIE, 5, 5);
+			double r = EliteAiGameTests.followRange(mobs[i]);
+			players[i] = arenas[i].player(h, "pd_lp_" + i, PersonalDifficultyMode.ELITE, 5 + r * 2.8, 5);
+			players[i].addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 100000, 4, false, false));
+		}
+		everyTick(h, () -> {
+			for (int i = 0; i < 2; i++) {
+				tickPlayer(players[i]);
+				Mob m = mobs[i];
+				if (h.getTick() == 5) {
+					m.setTarget(players[i]);
+					start[i] = m.distanceTo(players[i]);
+					var path = m.getNavigation().createPath(players[i], 0);
+					reachesAtStart[i] = path != null && path.canReach();
+				}
+				if (h.getTick() > 5) {
+					heldTicks[i] += m.getTarget() == players[i] ? 1 : 0;
+					closest[i] = Math.min(closest[i], m.distanceTo(players[i]));
+					var current = m.getNavigation().getPath();
+					if (current != null && !current.canReach() && h.getTick() % 20 == 0) {
+						partialPlans[i]++;
+					}
+				}
+			}
+		});
+		at(h, 600, () -> {
+			for (int i = 0; i < 2; i++) {
+				System.out.printf(java.util.Locale.ROOT, "PURSUIT-MEASURE %-6s start %.1f blocks, closest %.1f, target held %d/594 ticks, complete route at start %b, partial-route samples %d%n",
+					i == 0 ? "open" : "chasm", start[i], closest[i], heldTicks[i], reachesAtStart[i], partialPlans[i]);
+			}
+			open.close();
+			chasm.close();
+			h.succeed();
+		});
+	}
 }
