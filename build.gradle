@@ -38,6 +38,8 @@ loom {
 		// JUnit-style XML for the in-server tests
 		gameTest {
 			property "fabric-api.gametest.report-file", layout.buildDirectory.file("reports/gametest/junit.xml").get().asFile.absolutePath
+			// the Phase 5 performance measurement runs only when asked for: ./gradlew build -PpdPerf=true
+			property "pd.perf", String.valueOf(project.findProperty("pdPerf") ?: "false")
 		}
 	}
 }

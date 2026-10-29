@@ -21,7 +21,8 @@
 			"com.zaggazach.personaldifficulty.gametest.ConfigCommandGameTests",
 				"com.zaggazach.personaldifficulty.gametest.AdminTranscriptGameTests",
 				"com.zaggazach.personaldifficulty.gametest.AdminMenuGameTests",
-			"com.zaggazach.personaldifficulty.gametest.EliteAlertGameTests"
+			"com.zaggazach.personaldifficulty.gametest.EliteAlertGameTests",
+			"com.zaggazach.personaldifficulty.gametest.PerformanceGameTests"
 		]
 	},
 	"depends": {
