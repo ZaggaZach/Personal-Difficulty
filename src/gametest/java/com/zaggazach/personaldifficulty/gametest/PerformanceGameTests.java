@@ -227,6 +227,38 @@ public class PerformanceGameTests {
 		int[][] hunting = new int[2][2];
 		int[][] counted = new int[2][2];
 		long start = h.getTick();
+		// two runs each had one ~1.7-second tick in the near/Elite part: a sampler thread records where the server thread is
+		// whenever a single tick has been running for more than 300 ms
+		Thread serverThread = Thread.currentThread();
+		List<String> stalls = java.util.Collections.synchronizedList(new ArrayList<>());
+		Thread sampler = new Thread(() -> {
+			int lastTick = server.getTickCount();
+			long since = System.nanoTime();
+			int sampledTick = -1;
+			while (!Thread.currentThread().isInterrupted()) {
+				try {
+					Thread.sleep(25);
+				} catch (InterruptedException e) {
+					return;
+				}
+				int tick = server.getTickCount();
+				long now = System.nanoTime();
+				if (tick != lastTick) {
+					lastTick = tick;
+					since = now;
+				} else if (now - since > 300_000_000L && sampledTick != tick && stalls.size() < 6) {
+					sampledTick = tick;
+					StringBuilder trace = new StringBuilder("PERF-STALL tick " + tick + " running for " + (now - since) / 1_000_000 + " ms at:");
+					StackTraceElement[] frames = serverThread.getStackTrace();
+					for (int i = 0; i < Math.min(40, frames.length); i++) {
+						trace.append("\n    ").append(frames[i]);
+					}
+					stalls.add(trace.toString());
+				}
+			}
+		}, "pd-perf-stall-sampler");
+		sampler.setDaemon(true);
+		sampler.start();
 		everyTick(h, () -> {
 			tickPlayer(p);
 			p.setHealth(p.getMaxHealth());
@@ -289,10 +321,15 @@ public class PerformanceGameTests {
 					}
 				}
 				out.append(String.format(Locale.ROOT, "PERF-UNREACHABLE target: the near difference at most +1.00 ms -> %s", nearDiff <= 1.0 ? "WITHIN TARGET" : "OVER TARGET"));
+				sampler.interrupt();
+				synchronized (stalls) {
+					out.append(stalls.isEmpty() ? "\nPERF-STALL none (no tick ran longer than 300 ms)" : "\n" + String.join("\n", stalls));
+				}
 				System.out.println(out);
 				double huntedFar = counted[0][1] == 0 ? 0 : hunting[0][1] / (double) counted[0][1];
 				check(huntedFar > HUNTERS / 2.0, "premise: the zombies hunted the far Elite player (" + huntedFar + " on average)");
 			} finally {
+				sampler.interrupt();
 				a.close();
 			}
 			h.succeed();

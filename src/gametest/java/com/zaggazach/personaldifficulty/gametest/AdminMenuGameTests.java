@@ -690,7 +690,15 @@ public class AdminMenuGameTests {
 			click(admin, HUB_PLAYERS);
 			String ghostLabel = ghost.toString();
 			boolean found = false;
-			for (int pageNo = 0; pageNo < 80 && !found; pageNo++) {
+			// the run directory persists between runs and every run leaves records behind, so the list keeps growing: page until
+			// the ghost is found or NEXT no longer changes the page (the last page), not a fixed number of pages
+			String previousFirst = null;
+			for (int pageNo = 0; pageNo < 100_000 && !found; pageNo++) {
+				String first = label(admin, 0);
+				if (pageNo > 0 && first.equals(previousFirst)) {
+					break;
+				}
+				previousFirst = first;
 				for (int slot = 0; slot < 45; slot++) {
 					if (label(admin, slot).equals(ghostLabel)) {
 						found = true;
