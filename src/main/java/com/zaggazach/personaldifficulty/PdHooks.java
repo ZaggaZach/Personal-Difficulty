@@ -273,15 +273,18 @@ public final class PdHooks {
 	}
 
 	/**
-	 * The path search's visited-node multiplier for a mob hunting an Elite player: vanilla's multiplier times the factor by which
-	 * {@link #maxPathLength} stretched the search (so the budget stays at vanilla's 16 nodes per block of search length).
+	 * The path search's visited-node multiplier for a mob hunting an Elite player: vanilla's multiplier times the SQUARE of the
+	 * factor by which {@link #maxPathLength} stretched the search. The ground a search may have to cover grows with the square of
+	 * its reach; with only the linear factor (tried first) a zombie still stalled at the edge of a 75-block chasm. 3x reach gives
+	 * 9x the budget (about 5,000 nodes for a zombie); the cost is measured in {@code PerformanceGameTests}.
 	 */
 	public static float visitedNodesMultiplier(Mob mob, float followRange, float vanilla) {
 		if (!(followRange > 0)) {
 			return vanilla;
 		}
 		float stretched = maxPathLength(mob, followRange);
-		return stretched > followRange ? vanilla * (stretched / followRange) : vanilla;
+		float factor = stretched / followRange;
+		return stretched > followRange ? vanilla * factor * factor : vanilla;
 	}
 
 	/** Melee mobs' "should I start chasing?" re-check delay. */

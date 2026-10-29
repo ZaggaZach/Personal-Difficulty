@@ -33,7 +33,7 @@ abstract class PathNavigationMixin {
 	 * the attribute, so a search stretched to 3x the distance for an Elite target still had the 1x budget. On open ground that
 	 * is enough; around an obstacle the search ran out and returned a partial route that ended at the obstacle (a measured
 	 * zombie stalled at the edge of a chasm 59 blocks from its Elite target). While the target is an Elite player, the budget
-	 * gets the same factor as the search length, keeping vanilla's own 16-nodes-per-block ratio. Every other search is untouched.
+	 * grows with the square of the stretch factor (see {@link PdHooks#visitedNodesMultiplier}). Every other search is untouched.
 	 */
 	@ModifyArg(method = "createPath(Ljava/util/Set;IZIF)Lnet/minecraft/world/level/pathfinder/Path;",
 		at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/pathfinder/PathFinder;findPath(Lnet/minecraft/world/level/PathNavigationRegion;Lnet/minecraft/world/entity/Mob;Ljava/util/Set;FIF)Lnet/minecraft/world/level/pathfinder/Path;"),
