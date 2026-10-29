@@ -9,6 +9,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -91,12 +92,10 @@ public class PerformanceGameTests {
 		border(a);
 		List<Mob> mobs = new ArrayList<>();
 		for (int i = 0; i < ZOMBIES + SKELETONS; i++) {
-			double x = 6 + (i % 20) * 5.5;
-			double z = 6 + (i / 20) * 9.0;
-			Mob m = a.spawn(i < ZOMBIES ? EntityTypes.ZOMBIE : EntityTypes.SKELETON, x, z);
-			m.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.IRON_HELMET)); // nobody burns in daylight mid-measurement
-			mobs.add(m);
+			mobs.add(spawnCrowdMember(a, i));
 		}
+		Map<String, Integer> deaths = new TreeMap<>();
+		int[] replaced = {0};
 		List<ServerPlayer> players = new ArrayList<>();
 		for (int i = 0; i < PLAYERS; i++) {
 			ServerPlayer p = a.player(h, "pd_perf_" + i, PersonalDifficultyMode.NORMAL, 20 + i * 20, 50);
@@ -108,6 +107,7 @@ public class PerformanceGameTests {
 		for (Setup s : order) {
 			samples.put(s, new ArrayList<>());
 		}
+		java.util.Set<Mob> counted = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
 		Setup[] current = {Setup.NO_ELITE};
 		apply(current[0], players);
 		long start = h.getTick();
@@ -115,6 +115,14 @@ public class PerformanceGameTests {
 			for (ServerPlayer p : players) {
 				tickPlayer(p);
 				p.setHealth(p.getMaxHealth()); // the measurement must not end because a player died
+			}
+			for (int i = 0; i < mobs.size(); i++) {
+				Mob m = mobs.get(i);
+				if (m.isDeadOrDying() && !counted.contains(m)) {
+					counted.add(m);
+					var src = m.getLastDamageSource();
+					deaths.merge(src == null ? "unknown" : src.getMsgId(), 1, Integer::sum);
+				}
 			}
 			long t = h.getTick() - start;
 			if (t < WARMUP) {
@@ -126,9 +134,18 @@ public class PerformanceGameTests {
 				return;
 			}
 			Setup s = order[window % order.length];
-			if (inPhase == 0 && s != current[0]) {
-				current[0] = s;
-				apply(s, players);
+			if (inPhase == 0) {
+				// every window starts with the full crowd: a mob that died (the crowd crams, skeletons hit zombies) is replaced
+				for (int i = 0; i < mobs.size(); i++) {
+					if (!mobs.get(i).isAlive()) {
+						mobs.set(i, spawnCrowdMember(a, i));
+						replaced[0]++;
+					}
+				}
+				if (s != current[0]) {
+					current[0] = s;
+					apply(s, players);
+				}
 			}
 			if (inPhase >= SETTLE) {
 				long[] times = server.getTickTimesNanos();
@@ -141,7 +158,7 @@ public class PerformanceGameTests {
 				Runtime r = Runtime.getRuntime();
 				StringBuilder out = new StringBuilder();
 				out.append("PERF scenario: ").append(ZOMBIES).append(" zombies + ").append(SKELETONS).append(" skeletons (").append(alive).append(" alive at the end), ")
-					.append(PLAYERS).append(" players; ").append(WINDOW - SETTLE).append(" measured ticks per window, 2 windows per setup\n");
+					.append(PLAYERS).append(" players; ").append(replaced[0]).append(" replaced at window starts; deaths by cause ").append(deaths).append("; ").append(WINDOW - SETTLE).append(" measured ticks per window, 2 windows per setup\n");
 				out.append("PERF machine: ").append(r.availableProcessors()).append(" CPU threads, max heap ").append(r.maxMemory() >> 20).append(" MB, Java ")
 					.append(System.getProperty("java.version")).append(", ").append(System.getProperty("os.name")).append('\n');
 				double base = mean(samples.get(Setup.NO_ELITE));
@@ -155,13 +172,22 @@ public class PerformanceGameTests {
 				out.append(String.format(Locale.ROOT, "PERF target (plan): everything new adds at most 1.00 ms per tick over the baseline -> measured %+.2f ms: %s",
 					(all - base) / 1e6, (all - base) / 1e6 <= 1.0 ? "WITHIN TARGET" : "OVER TARGET"));
 				System.out.println(out);
-				check(alive > (ZOMBIES + SKELETONS) * 0.9, "the crowd survived the measurement (" + alive + " alive)");
+				check(alive > (ZOMBIES + SKELETONS) / 2, "the crowd was still there at the end (" + alive + " alive; every window started with all of them)");
 			} finally {
 				ConfigCommandGameTests.cleanOverrides();
 				a.close();
 			}
 			h.succeed();
 		});
+	}
+
+	/** Crowd member {@code i} at its fixed starting spot (zombies first, then skeletons). */
+	private static Mob spawnCrowdMember(Arena a, int i) {
+		double x = 6 + (i % 20) * 5.5;
+		double z = 6 + (i / 20) * 9.0;
+		Mob m = a.spawn(i < ZOMBIES ? EntityTypes.ZOMBIE : EntityTypes.SKELETON, x, z);
+		m.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.IRON_HELMET)); // nobody burns in daylight mid-measurement
+		return m;
 	}
 
 	/**
