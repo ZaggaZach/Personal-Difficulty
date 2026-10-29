@@ -164,6 +164,7 @@ public class EliteAlertGameTests {
 		int[] canAttackOn = {0};
 		int[] samples = {0};
 		boolean[] had = {false};
+		boolean[] hadN = {false};
 		everyTick(h, () -> {
 			tickPlayer(pE);
 			tickPlayer(pN);
@@ -172,7 +173,13 @@ public class EliteAlertGameTests {
 				eliteExtended[0]++;
 			}
 			had[0] = has;
-			normalTicks[0] += mN.getTarget() == pN ? 1 : 0;
+			// a Normal player is judged like in the other acquisition tests: only an acquisition BEYOND the witch's vanilla range
+			// counts (its idle stroll may bring it inside that range, and then vanilla targeting is correct)
+			boolean hasN = mN.getTarget() == pN;
+			if (hasN && !hadN[0] && mN.distanceTo(pN) > rN + 0.5) {
+				normalTicks[0]++;
+			}
+			hadN[0] = hasN;
 			Boolean c = canAttack(mE);
 			if (c != null) {
 				samples[0]++;
@@ -180,11 +187,11 @@ public class EliteAlertGameTests {
 			}
 		});
 		at(h, 240, () -> {
-			String report = "WITCH follow range " + fmt(rE) + "; Elite acquired beyond it " + eliteExtended[0] + " time(s); Normal targeted " + normalTicks[0]
-				+ " ticks; canAttack on " + canAttackOn[0] + "/" + samples[0] + " ticks";
+			String report = "WITCH follow range " + fmt(rE) + "; Elite acquired beyond it " + eliteExtended[0] + " time(s); Normal acquired beyond it " + normalTicks[0]
+				+ " time(s); canAttack on " + canAttackOn[0] + "/" + samples[0] + " ticks";
 			System.out.println(report);
 			check(eliteExtended[0] > 0, "a witch acquires an Elite player beyond its vanilla range: " + report);
-			check(normalTicks[0] == 0, "and never a Normal player at that distance: " + report);
+			check(normalTicks[0] == 0, "and never a Normal player beyond vanilla range: " + report);
 			a.close();
 			h.succeed();
 		});
