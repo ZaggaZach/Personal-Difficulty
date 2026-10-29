@@ -74,15 +74,12 @@ class EliteSurvivalTest {
 
 	@Test
 	void theRaisedMultiplierLimitsOf140AreAccepted() {
-		PdConfig c = PdConfigLoader.parse("elite.ai.acquisition-range-multiplier=3
-elite.ai.follow-range-multiplier=2.5
-elite.ai.target-memory-multiplier=5").config();
+		PdConfig c = PdConfigLoader.parse("elite.ai.acquisition-range-multiplier=3\nelite.ai.follow-range-multiplier=2.5\nelite.ai.target-memory-multiplier=5").config();
 		assertEquals(3.0, c.eliteAi().acquisitionRangeMultiplier());
 		assertEquals(2.5, c.eliteAi().followRangeMultiplier());
 		assertEquals(5.0, c.eliteAi().targetMemoryMultiplier());
 		assertEquals(300, EliteSurvival.memoryTicks(60, 5.0), "60 ticks x 5 = 15 seconds, below the 400-tick ceiling");
-		PdConfig over = PdConfigLoader.parse("elite.ai.acquisition-range-multiplier=3.5
-elite.ai.target-memory-multiplier=6").config();
+		PdConfig over = PdConfigLoader.parse("elite.ai.acquisition-range-multiplier=3.5\nelite.ai.target-memory-multiplier=6").config();
 		assertEquals(3.0, over.eliteAi().acquisitionRangeMultiplier(), "clamped to 3.0");
 		assertEquals(5.0, over.eliteAi().targetMemoryMultiplier(), "clamped to 5.0");
 	}
