@@ -2,7 +2,11 @@
 
 ## 1.3.1-rc.3: UNPUBLISHED development checkpoint (Phase 4 of the 1.4.0 line: Settings in the admin menu)
 
-> **Status: in development, NOT published, NOT yet tested in a graphical client.** Builds on `1.3.1-rc.2`.
+> **Status: a private checkpoint, NOT published.** Builds on `1.3.1-rc.2`.
+>
+> **Phase 4 testing: PASSED (29 October 2026).** `./gradlew build` green (unit tests and all 166 GameTests). Tested in a real
+> client on the dedicated test server by an operator: the Settings hub and pages, - and +, shift-click, the Reset brush, an on/off
+> toggle, and an override surviving a server restart.
 
 ### Added
 * **Settings** in the admin menu (main menu, middle button), so settings can be changed without editing files:
