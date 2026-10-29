@@ -484,7 +484,9 @@ public class EliteAiGameTests {
 		z.setTarget(elite);
 		check(PdHooks.meleeRecheckTicks(z, 20L) == 5L, "melee re-check delay is shortened against an Elite target");
 		check(PdHooks.maxPathLength(z, 35.0F) > 35.0F, "path length is longer against an Elite target");
-		check(PdHooks.targetMemoryTicks(elite, 60) == 120, "target memory doubles for an Elite target");
+		int expectedMemory = com.zaggazach.personaldifficulty.logic.EliteSurvival.memoryTicks(60, rt().config().eliteAi().targetMemoryMultiplier());
+		check(expectedMemory > 60 && PdHooks.targetMemoryTicks(elite, 60) == expectedMemory,
+			"target memory is multiplied for an Elite target (60 -> " + expectedMemory + " ticks; 300 with the 1.4.0 default 5x)");
 		check(PdHooks.pursuitDistance(elite, 35.0) > 35.0, "pursuit distance grows for an Elite target");
 		for (ServerPlayer other : List.of(normal, peaceful)) {
 			z.setTarget(null);
