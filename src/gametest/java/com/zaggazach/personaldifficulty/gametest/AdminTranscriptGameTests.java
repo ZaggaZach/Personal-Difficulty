@@ -146,7 +146,8 @@ public class AdminTranscriptGameTests {
 		String golden;
 		try (InputStream in = AdminTranscriptGameTests.class.getResourceAsStream(GOLDEN)) {
 			check(in != null, "the golden transcript resource " + GOLDEN + " is missing");
-			golden = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+			// a Windows checkout may turn the resource's line endings into CRLF; the transcript itself is always built with \n
+			golden = new String(in.readAllBytes(), StandardCharsets.UTF_8).replace("\r\n", "\n");
 		} catch (IOException e) {
 			throw new AssertionError(e);
 		}
