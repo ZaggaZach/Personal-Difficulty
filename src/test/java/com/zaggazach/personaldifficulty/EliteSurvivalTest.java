@@ -116,7 +116,7 @@ class EliteSurvivalTest {
 	void applyingTheFunctionsTwiceIsNotCompounding() {
 		// each hook recomputes from the vanilla value on every call; feeding vanilla again gives the same answer
 		assertEquals(EliteSurvival.regenInterval(10, 0.5), EliteSurvival.regenInterval(10, 0.5));
-		assertEquals(EliteSurvival.cappedRange(35, 1.25), EliteSurvival.cappedRange(35, 1.25));
+		assertEquals(EliteSurvival.cappedRange(35, 1.25, 64), EliteSurvival.cappedRange(35, 1.25, 64));
 		assertEquals(EliteSurvival.memoryTicks(60, 2.0), EliteSurvival.memoryTicks(60, 2.0));
 	}
 

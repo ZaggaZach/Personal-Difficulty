@@ -20,7 +20,11 @@
 * GameTests: a live listener zombie walks to where a sentry saw an Elite player and not to where the player hid; a Normal
   player's sighting is never passed on; nothing happens with the setting off. These run in their own test environment
   (`personaldifficulty-gametest:elite_alerts`), which switches the feature on only for that batch.
-* A witch diagnostic GameTest (reports only, never fails) for the plan's witch root-cause step.
+* **Witches: root cause found, now covered by a live test.** A witch's player goal runs only while its `canAttack` flag is on,
+  and outside a raid it is on all the time (it is off only during the witch's raider-healing cooldown). The 1.2.0 finding no
+  longer reproduces: since 1.3.0 the Elite hunting scan sets the target directly, and a live GameTest shows a witch acquiring an
+  Elite player beyond its vanilla range (238 of 240 ticks in the first run) and never a Normal player at that distance.
+* The unit tests also run outside Gradle in the development environment now, so most mistakes are caught before a build.
 
 ## 1.3.1-rc.3: UNPUBLISHED development checkpoint (Phase 4 of the 1.4.0 line: Settings in the admin menu)
 

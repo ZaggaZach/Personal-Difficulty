@@ -139,41 +139,51 @@ public class EliteAlertGameTests {
 		});
 	}
 
-	// ------------------------------------------------------------------ witch root cause (diagnostic only; it reports, never fails)
+	// ------------------------------------------------------------------ witches (the plan's root-cause step)
 
-	@GameTest(maxTicks = 260, required = false)
-	public void diag_witch_targetingAgainstEliteAndNormalPlayers(GameTestHelper h) {
+	/**
+	 * Root cause of the 1.2.0 finding ("no extended acquisition for witches"), established with the diagnostic this test grew out
+	 * of: a witch's player goal only runs while its {@code canAttack} flag is on, and outside a raid that flag is on all the time
+	 * (it is off only while the witch's raider-healing cooldown runs). Since 1.3.0 the Elite hunting scan sets the target directly,
+	 * so witches acquire Elite players at the extended range like the other supported mobs. Normal lane: a Normal player at the same
+	 * distance is never acquired.
+	 */
+	@GameTest(maxTicks = 260)
+	public void ai_witch_acquiresAnElitePlayerAtTheExtendedRange_neverANormalOne(GameTestHelper h) {
 		Arena a = new Arena(h, 93);
-		Mob near = a.spawnOnIsland(EntityTypes.WITCH, 5, 5);
-		Mob far = a.spawnOnIsland(EntityTypes.WITCH, 5, 80 + 5);
-		double rNear = near.getAttributeValue(Attributes.FOLLOW_RANGE);
-		double rFar = far.getAttributeValue(Attributes.FOLLOW_RANGE);
-		ServerPlayer pNear = a.player(h, "pd_wd_n", PersonalDifficultyMode.ELITE, 5 + rNear * 0.5, 5);
-		ServerPlayer pFar = a.player(h, "pd_wd_f", PersonalDifficultyMode.ELITE, 5 + rFar * 1.12, 80 + 5);
-		int[] ticks = new int[2];
-		int[] canAttackTrue = new int[2];
-		int[] samples = new int[2];
+		Mob mE = a.spawnOnIsland(EntityTypes.WITCH, 5, 5);
+		Mob mN = a.spawnOnIsland(EntityTypes.WITCH, 5, 80 + 5);
+		double rE = mE.getAttributeValue(Attributes.FOLLOW_RANGE);
+		double rN = mN.getAttributeValue(Attributes.FOLLOW_RANGE);
+		ServerPlayer pE = a.player(h, "pd_wi_e", PersonalDifficultyMode.ELITE, 5 + rE * 1.12, 5);
+		ServerPlayer pN = a.player(h, "pd_wi_n", PersonalDifficultyMode.NORMAL, 5 + rN * 1.12, 80 + 5);
+		pE.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 100000, 4, false, false));
+		int[] eliteExtended = {0};
+		int[] normalTicks = {0};
+		int[] canAttackOn = {0};
+		int[] samples = {0};
+		boolean[] had = {false};
 		everyTick(h, () -> {
-			tickPlayer(pNear);
-			tickPlayer(pFar);
-			ticks[0] += near.getTarget() == pNear ? 1 : 0;
-			ticks[1] += far.getTarget() == pFar ? 1 : 0;
-			Boolean c0 = canAttack(near);
-			Boolean c1 = canAttack(far);
-			if (c0 != null) {
-				samples[0]++;
-				canAttackTrue[0] += c0 ? 1 : 0;
+			tickPlayer(pE);
+			tickPlayer(pN);
+			boolean has = mE.getTarget() == pE;
+			if (has && !had[0] && mE.distanceTo(pE) > rE + 0.5) {
+				eliteExtended[0]++;
 			}
-			if (c1 != null) {
-				samples[1]++;
-				canAttackTrue[1] += c1 ? 1 : 0;
+			had[0] = has;
+			normalTicks[0] += mN.getTarget() == pN ? 1 : 0;
+			Boolean c = canAttack(mE);
+			if (c != null) {
+				samples[0]++;
+				canAttackOn[0] += c ? 1 : 0;
 			}
 		});
 		at(h, 240, () -> {
-			System.out.println("WITCH-DIAG follow ranges " + fmt(rNear) + " / " + fmt(rFar) + "; huntsPlayers " + ((HuntingMob) near).personaldifficulty$huntsPlayers()
-				+ "; inside vanilla range (0.5x): targeted " + ticks[0] + " ticks, canAttack " + canAttackTrue[0] + "/" + samples[0]
-				+ "; extended range (1.12x): targeted " + ticks[1] + " ticks, canAttack " + canAttackTrue[1] + "/" + samples[1]
-				+ "; witch is " + (near instanceof Witch ? "a Witch" : near.getClass().getSimpleName()));
+			String report = "WITCH follow range " + fmt(rE) + "; Elite acquired beyond it " + eliteExtended[0] + " time(s); Normal targeted " + normalTicks[0]
+				+ " ticks; canAttack on " + canAttackOn[0] + "/" + samples[0] + " ticks";
+			System.out.println(report);
+			check(eliteExtended[0] > 0, "a witch acquires an Elite player beyond its vanilla range: " + report);
+			check(normalTicks[0] == 0, "and never a Normal player at that distance: " + report);
 			a.close();
 			h.succeed();
 		});

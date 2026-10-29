@@ -147,7 +147,9 @@ class SettingRegistryTest {
 	@Test
 	void timingLabelsAreAssignedAsDocumented() {
 		for (SettingDef d : SettingRegistry.scalars()) {
-			SettingDef.Timing expected = d.key().startsWith("elite.priority.") ? SettingDef.Timing.NEXT_SCAN : SettingDef.Timing.LIVE;
+			// read by each mob's own hunting scan: the priority scan and (1.4.0) the alert network and last-known search
+			boolean scan = d.key().startsWith("elite.priority.") || d.key().startsWith("elite.alert.");
+			SettingDef.Timing expected = scan ? SettingDef.Timing.NEXT_SCAN : SettingDef.Timing.LIVE;
 			assertEquals(expected, d.timing(), d.key());
 		}
 	}

@@ -28,8 +28,10 @@ import org.junit.jupiter.api.io.TempDir;
  * <p><b>Approved changes (1.4.0 plan, decision 6):</b> the Elite AI range multipliers may go up to 3.0 (was 2.0) and the memory
  * multiplier up to 5.0 (was 4.0). For those three keys only, a value the 1.3.0 loader would have clamped (a finite number above
  * its old maximum) is left out of the comparison; every other value, including every invalid spelling, is still compared, and the
- * new limits are tested directly in {@code EliteSurvivalTest}. The new key {@code elite.ai.absolute-range-cap} is unknown to the
- * 1.3.0 loader and is never part of the generated inputs.
+ * new limits are tested directly in {@code EliteSurvivalTest}. For values that both loaders clamp to the minimum, the only
+ * difference is the range named in the warning ("outside [1.0, 2.0]" becomes "outside [1.0, 3.0]"); exactly that text is
+ * translated in the 1.3.0 warnings before comparing. The new key {@code elite.ai.absolute-range-cap} is unknown to the 1.3.0
+ * loader and is never part of the generated inputs.
  */
 class LoaderDifferentialTest {
 	/** Every scalar key, written out by hand (NOT taken from the registry, so the test is independent of it). */
@@ -100,9 +102,22 @@ class LoaderDifferentialTest {
 		return q;
 	}
 
+	/** The 1.3.0 warning for one of the three raised keys, naming the 1.4.0 range instead of the old one (and nothing else). */
+	private static String withRaisedRangeText(String warning) {
+		for (var e : RAISED_MAXIMUM.entrySet()) {
+			if (warning.startsWith(e.getKey() + "=")) {
+				double newMax = e.getValue() + 1.0;
+				return warning.replace("is outside [1.0, " + e.getValue() + "]", "is outside [1.0, " + newMax + "]");
+			}
+		}
+		return warning;
+	}
+
 	private static void compare(Properties original, String label) {
 		Properties p = withoutApprovedChanges(original);
-		LegacyConfigLoader.Result expected = LegacyConfigLoader.fromProperties(p);
+		LegacyConfigLoader.Result legacy = LegacyConfigLoader.fromProperties(p);
+		LegacyConfigLoader.Result expected = new LegacyConfigLoader.Result(legacy.config(),
+			legacy.warnings().stream().map(LoaderDifferentialTest::withRaisedRangeText).toList(), legacy.readFailed());
 		PdConfigLoader.Result actual = PdConfigLoader.fromProperties(p);
 		assertEquals(expected.config(), actual.config(), "config differs for " + label + " " + p);
 		assertEquals(expected.readFailed(), actual.readFailed(), "readFailed differs for " + label);
