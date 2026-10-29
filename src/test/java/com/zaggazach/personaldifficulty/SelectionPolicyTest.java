@@ -302,8 +302,9 @@ class SelectionPolicyTest {
 								}
 								case SWITCH -> {
 									assertEquals(RestrictStatus.APPLY, plan.status(), ctx);
-									PersonalDifficultyMode expected = list.contains(NORMAL) ? NORMAL : list.stream().min(java.util.Comparator.naturalOrder()).orElseThrow();
-									assertEquals(expected, plan.result().mode(), "switch target is NORMAL if listed, else the first listed in canonical order: " + ctx);
+									// fixed preference, deliberately NOT the enum's display order: Peaceful only as a last resort
+									PersonalDifficultyMode expected = java.util.stream.Stream.of(NORMAL, EASY, HARD, ELITE, PEACEFUL).filter(list::contains).findFirst().orElseThrow();
+									assertEquals(expected, plan.result().mode(), "switch target is the first listed of NORMAL, EASY, HARD, ELITE, PEACEFUL: " + ctx);
 									assertTrue(list.contains(plan.result().mode()), ctx);
 									assertTrue(plan.modeSwitched(), ctx);
 									assertFalse(plan.result().isException(), ctx);

@@ -53,7 +53,8 @@ class AvailabilityPolicyTest {
 		assertFalse(restarted.isEnabled(PersonalDifficultyMode.ELITE));
 		assertFalse(restarted.isEnabled(PersonalDifficultyMode.PEACEFUL));
 		assertTrue(restarted.isEnabled(PersonalDifficultyMode.EASY));
-		assertEquals("{\"version\":1,\"disabled\":[\"elite\",\"peaceful\"]}", Files.readString(f));
+		// written in display order (PEACEFUL..ELITE since 1.3.1-rc.2); reading never depends on the order
+		assertEquals("{\"version\":1,\"disabled\":[\"peaceful\",\"elite\"]}", Files.readString(f));
 	}
 
 	@Test

@@ -2,6 +2,7 @@ package com.zaggazach.personaldifficulty;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -19,7 +20,9 @@ class FrozenLoaderIntegrityTest {
 	@Test
 	void theFrozenLoaderSourceIsUnchanged() throws Exception {
 		Path file = Path.of("src/test/java/com/zaggazach/personaldifficulty/legacy/LegacyConfigLoader.java");
-		String actual = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)));
+		// hashed with \n line endings, so a Windows checkout (CRLF) of an unchanged file still matches
+		byte[] lf = Files.readString(file, StandardCharsets.UTF_8).replace("\r\n", "\n").getBytes(StandardCharsets.UTF_8);
+		String actual = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(lf));
 		assertEquals(EXPECTED_SHA256, actual, "LegacyConfigLoader.java was modified: it is a frozen oracle (see its header)");
 	}
 }
