@@ -226,6 +226,7 @@ public class PerformanceGameTests {
 		List<List<List<Long>>> samples = List.of(List.of(new ArrayList<>(), new ArrayList<>()), List.of(new ArrayList<>(), new ArrayList<>()));
 		int[][] hunting = new int[2][2];
 		int[][] counted = new int[2][2];
+		long[][] searches = new long[2][2]; // hidden-reacquire route searches during the measured ticks
 		long start = h.getTick();
 		// two runs each had one ~1.7-second tick in the near/Elite part: a sampler thread records where the server thread is
 		// whenever a single tick has been running for more than 300 ms
@@ -291,6 +292,11 @@ public class PerformanceGameTests {
 			if (inPhase == 0) {
 				setMode(p, lane == 1 ? PersonalDifficultyMode.ELITE : PersonalDifficultyMode.NORMAL);
 			}
+			if (inPhase == SETTLE) {
+				searches[part][lane] -= com.zaggazach.personaldifficulty.PdHunt.routeSearches();
+			} else if (inPhase == WINDOW - 1) {
+				searches[part][lane] += com.zaggazach.personaldifficulty.PdHunt.routeSearches();
+			}
 			if (inPhase >= SETTLE) {
 				long[] times = server.getTickTimesNanos();
 				samples.get(part).get(lane).add(times[(server.getTickCount() + times.length - 1) % times.length]);
@@ -308,10 +314,10 @@ public class PerformanceGameTests {
 					for (int lane = 0; lane < 2; lane++) {
 						List<Long> v = samples.get(part).get(lane);
 						mean[lane] = mean(v);
-						out.append(String.format(Locale.ROOT, "PERF-UNREACHABLE %-17s player %-6s mean %6.2f ms  median %6.2f  sd %5.2f  p95 %6.2f  max %7.2f  (n=%d)  zombies hunting %.1f%n",
+						out.append(String.format(Locale.ROOT, "PERF-UNREACHABLE %-17s player %-6s mean %6.2f ms  median %6.2f  sd %5.2f  p95 %6.2f  max %7.2f  (n=%d)  zombies hunting %.1f  route searches %d%n",
 							name, lane == 1 ? "Elite" : "Normal", mean[lane] / 1e6, median(v) / 1e6, sd(v, mean[lane]) / 1e6, p95(v) / 1e6,
 							v.stream().mapToLong(Long::longValue).max().orElse(0) / 1e6, v.size(),
-							counted[part][lane] == 0 ? 0.0 : hunting[part][lane] / (double) counted[part][lane]));
+							counted[part][lane] == 0 ? 0.0 : hunting[part][lane] / (double) counted[part][lane], searches[part][lane]));
 					}
 					double diff = (mean[1] - mean[0]) / 1e6;
 					out.append(String.format(Locale.ROOT, "PERF-UNREACHABLE %-17s difference %+6.2f ms%s%n", name, diff,

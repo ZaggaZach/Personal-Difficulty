@@ -336,6 +336,9 @@ public final class PdHunt {
 		return best;
 	}
 
+	/** After a failed hidden-reacquire route check the mob makes no new one for this long (3 s). */
+	static final int ROUTE_CHECK_PAUSE_TICKS = 60;
+
 	private static @Nullable ServerPlayer rememberedAndReachable(
 		ServerLevel level, Mob mob, HuntingMob memory, List<ServerPlayer> elites, double range, PdConfig.EliteHunt cfg
 	) {
@@ -352,7 +355,17 @@ public final class PdHunt {
 			if (nearestVisible(level, mob, List.of(candidate), range, BLIND) == null) {
 				return null;
 			}
-			return hasCompleteRoute(level, mob, candidate) ? candidate : null;
+			// a failed route check is a full-budget search; repeating it every scan for every mob near an unreachable player was the
+			// measured cost (+2.3 ms for about 20 idle zombies at the foot of a pillar), so a failure pauses this mob's checks
+			long now = level.getGameTime();
+			if (now < memory.personaldifficulty$routeCheckAfter()) {
+				return null;
+			}
+			if (hasCompleteRoute(level, mob, candidate)) {
+				return candidate;
+			}
+			memory.personaldifficulty$setRouteCheckAfter(now + ROUTE_CHECK_PAUSE_TICKS);
+			return null;
 		}
 		return null;
 	}
@@ -361,7 +374,15 @@ public final class PdHunt {
 	 * A fresh, side-effect-free A* search with the mob's own pathfinder: true only if it reaches the target's block (so never
 	 * through solid blocks and never into a sealed room). Bounded by the mob's normal maximum path length and node budget.
 	 */
+	/** Diagnostics: hidden-reacquire route searches made since the server started (read by the performance measurement). */
+	private static long routeSearches;
+
+	public static long routeSearches() {
+		return routeSearches;
+	}
+
 	private static boolean hasCompleteRoute(ServerLevel level, Mob mob, ServerPlayer target) {
+		routeSearches++;
 		PathNavigationAccess access = (PathNavigationAccess) mob.getNavigation();
 		float maxLength = access.personaldifficulty$maxPathLength();
 		BlockPos from = mob.blockPosition().above();

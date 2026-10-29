@@ -47,4 +47,9 @@ public interface HuntingMob {
 	long personaldifficulty$gaveUpUntil();
 
 	void personaldifficulty$giveUp(@Nullable UUID player, long until);
+
+	/** Game tick before which this mob makes no new hidden-reacquire route check (set after a failed one). */
+	long personaldifficulty$routeCheckAfter();
+
+	void personaldifficulty$setRouteCheckAfter(long tick);
 }
