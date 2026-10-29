@@ -125,13 +125,14 @@ for Peaceful) or the mob dies. Nothing sees through walls and nothing is given e
 
 | Setting | Default | Effect | Verified by a live-AI test? |
 |---|---|---|---|
-| `elite.ai.acquisition-range-multiplier` | **1.25** | An idle mob may notice an Elite player out to this multiple of its own follow range (1.0 = off, max 2.0). Line of sight, sneaking/head-gear/invisibility rules, selectors and `canAttack` still apply; Peaceful players are never candidates. | yes: zombie, husk, skeleton, stray, creeper, vindicator, pillager |
-| `elite.ai.follow-range-multiplier` | **1.25** | A mob keeps hunting an Elite player, and its pathfinder searches for a route, out to this multiple (1.0 = off, max 2.0; the larger of this and the acquisition multiplier is used so that a target is never acquired and dropped on the next tick). | yes: zombie (target held, complete route found, closes in) |
+| `elite.ai.acquisition-range-multiplier` | **1.25** | An idle mob may notice an Elite player out to this multiple of its own follow range (1.0 = off, max 3.0). Line of sight, sneaking/head-gear/invisibility rules, selectors and `canAttack` still apply; Peaceful players are never candidates. | yes: zombie, husk, skeleton, stray, creeper, vindicator, pillager |
+| `elite.ai.follow-range-multiplier` | **1.25** | A mob keeps hunting an Elite player, and its pathfinder searches for a route, out to this multiple (1.0 = off, max 3.0; the larger of this and the acquisition multiplier is used so that a target is never acquired and dropped on the next tick). | yes: zombie (target held, complete route found, closes in) |
 | `elite.ai.improved-pursuit` | **true** | Master switch for the next setting and for a shorter melee "start chasing" re-check (5 instead of 20 ticks). | memory: yes (zombie); re-check: **hook-level only** |
-| `elite.ai.target-memory-multiplier` | **2.0** | A mob forgets an Elite target it cannot see after 2x as long (vanilla 60 ticks; max 4.0, never above 400 ticks). | yes: zombie, 61 vs 122 ticks |
+| `elite.ai.target-memory-multiplier` | **2.0** | A mob forgets an Elite target it cannot see after 2x as long (vanilla 60 ticks; max 5.0, never above 400 ticks). | yes: zombie, 61 vs 122 ticks |
 | `elite.ai.advanced-combat` | **true** | Skeleton-family bow cadence against Elite players is the vanilla *Hard* cadence (20 ticks between shots instead of 40) even in an Easy/Normal world. | yes: skeleton, 6 vs 9 arrows in 350 ticks |
+| `elite.ai.absolute-range-cap` | **128** | No Elite range adjustment reaches beyond this many blocks (16 .. 256; 1.3.0 used a fixed 64). The server's simulation distance is a further real limit. | unit-tested |
 
-No Elite adjustment ever reaches beyond **64 blocks** (unless the mob's own vanilla range is larger). Ranges are never
+No Elite adjustment ever reaches beyond `elite.ai.absolute-range-cap` (**128 blocks** by default; unless the mob's own vanilla range is larger). Ranges are never
 shrunk. If the world is already on Hard, the bow setting changes nothing (the cadence is the same). The existing
 `elite.ranged-max-uncertainty` still governs *aim*.
 
@@ -151,7 +152,7 @@ Hostile mobs now prefer an eligible Elite player over any other player - **inclu
   player takes the nearest eligible one, and the vanilla "nearest player" goal prefers Elite candidates when it does run and
   will not replace a valid Elite target with an ordinary player.
 * **Eligible** means: an Elite player (never Peaceful), alive, not a spectator, within the mob's acquisition range
-  (`elite.ai.acquisition-range-multiplier` x its own follow range, capped at 64) **and** passing the mob's own targeting rules:
+  (`elite.ai.acquisition-range-multiplier` x its own follow range, capped at `elite.ai.absolute-range-cap`) **and** passing the mob's own targeting rules:
   line of sight, invisibility, head gear, `canAttack`. No wallhacks, no teleporting, no global awareness.
 * **Stable.** A mob that already hunts a valid Elite player keeps that target; it never swaps between Elite players, so groups
   of Elite players cannot make it flip-flop. It switches only when its Elite target is gone (dead, Peaceful, out of range,
@@ -319,11 +320,12 @@ ranged.crossbow-mobs=true           # pillagers
 ranged.piglins=true
 ranged.witches=true
 elite.natural-regeneration-multiplier=0.50   # 0.1 .. 1.0, fraction of vanilla natural healing speed
-elite.ai.acquisition-range-multiplier=1.25   # 1.0 .. 2.0
-elite.ai.follow-range-multiplier=1.25        # 1.0 .. 2.0
+elite.ai.acquisition-range-multiplier=1.25   # 1.0 .. 3.0
+elite.ai.follow-range-multiplier=1.25        # 1.0 .. 3.0
 elite.ai.improved-pursuit=true
-elite.ai.target-memory-multiplier=2.0        # 1.0 .. 4.0
+elite.ai.target-memory-multiplier=2.0        # 1.0 .. 5.0
 elite.ai.advanced-combat=true
+elite.ai.absolute-range-cap=128              # 16 .. 256 blocks
 elite.priority.enabled=true                   # hostile mobs prefer Elite players
 elite.priority.scan-interval-ticks=10         # 5 .. 40
 elite.priority.reacquire-hidden-seconds=8     # 0 .. 30, 0 = off

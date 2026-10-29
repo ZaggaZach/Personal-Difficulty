@@ -105,6 +105,8 @@ public final class SettingRegistry {
 		e.add(flag(o += 10, "elite.ai.improved-pursuit", true, "Elite AI: improved pursuit", live, "eliteAi.improvedPursuit", c -> c.eliteAi().improvedPursuit()));
 		e.add(num(o += 10, "elite.ai.target-memory-multiplier", 1, PdConfig.MAX_MEMORY_MULTIPLIER, 2.0, 0.1, "Elite AI: target memory multiplier", live, "eliteAi.targetMemoryMultiplier", c -> c.eliteAi().targetMemoryMultiplier()));
 		e.add(flag(o += 10, "elite.ai.advanced-combat", true, "Elite AI: advanced combat", live, "eliteAi.advancedCombat", c -> c.eliteAi().advancedCombat()));
+		e.add(new SettingDef("elite.ai.absolute-range-cap", Type.INT, PdConfig.MIN_RANGE_CAP, PdConfig.MAX_RANGE_CAP, PdConfig.DEFAULT_RANGE_CAP, 8,
+			"Elite AI: absolute range cap (blocks)", live, o += 10, "eliteAi.absoluteRangeCap", c -> c.eliteAi().absoluteRangeCap()));
 		// Elite hunting (read by the per-mob scan)
 		e.add(flag(o += 10, "elite.priority.enabled", true, "Elite hunting: prefer Elite players", scan, "eliteHunt.priorityEnabled", c -> c.eliteHunt().priorityEnabled()));
 		e.add(whole(o += 10, "elite.priority.scan-interval-ticks", PdConfig.MIN_SCAN_INTERVAL_TICKS, PdConfig.MAX_SCAN_INTERVAL_TICKS, 10, "Elite hunting: scan interval (ticks)", scan, "eliteHunt.scanIntervalTicks", c -> c.eliteHunt().scanIntervalTicks()));

@@ -146,7 +146,7 @@ public final class PdHunt {
 		if (mob instanceof Spider && mob.getLightLevelDependentMagicValue() >= 0.5F) {
 			return;
 		}
-		double range = EliteSurvival.cappedRange(mob.getAttributeValue(Attributes.FOLLOW_RANGE), rt.config().eliteAi().acquisitionRangeMultiplier());
+		double range = EliteSurvival.cappedRange(mob.getAttributeValue(Attributes.FOLLOW_RANGE), rt.config().eliteAi().acquisitionRangeMultiplier(), rt.config().eliteAi());
 		ServerPlayer best = nearestVisible(level, mob, elites, range, SIGHT);
 		if (best == null) {
 			best = rememberedAndReachable(level, mob, memory, elites, range, cfg);
@@ -174,7 +174,7 @@ public final class PdHunt {
 		}
 		PdConfig.EliteAi ai = rt.config().eliteAi();
 		double follow = mob.getAttributeValue(Attributes.FOLLOW_RANGE);
-		double range = elite ? EliteSurvival.cappedRange(follow, EliteSurvival.pursuitFactor(ai)) : follow;
+		double range = elite ? EliteSurvival.cappedRange(follow, EliteSurvival.pursuitFactor(ai), ai) : follow;
 		int memoryTicks = elite && ai.improvedPursuit() ? EliteSurvival.memoryTicks(60, ai.targetMemoryMultiplier()) : 60;
 		return mob.distanceToSqr(target) <= range * range && memory.personaldifficulty$unseenTicks() <= memoryTicks;
 	}
@@ -251,7 +251,7 @@ public final class PdHunt {
 		if (elites.isEmpty()) {
 			return found;
 		}
-		double extended = EliteSurvival.cappedRange(vanillaRange, rt.config().eliteAi().acquisitionRangeMultiplier());
+		double extended = EliteSurvival.cappedRange(vanillaRange, rt.config().eliteAi().acquisitionRangeMultiplier(), rt.config().eliteAi());
 		if (extended <= vanillaRange && found != null) {
 			// range not widened: still allow an Elite player inside the plain range to win over an ordinary one
 			extended = vanillaRange;

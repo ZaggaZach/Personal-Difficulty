@@ -8,8 +8,8 @@ import com.zaggazach.personaldifficulty.config.PdConfig;
  * or after a configuration reload, can never accumulate.
  */
 public final class EliteSurvival {
-	/** No Elite adjustment ever makes a mob act beyond this absolute distance, whatever the config says. */
-	public static final double ABSOLUTE_RANGE_CAP = 64.0;
+	/** The fixed cap of 1.3.0; since 1.4.0 it is the setting {@code elite.ai.absolute-range-cap} (see {@link PdConfig.EliteAi}). */
+	public static final double LEGACY_RANGE_CAP = 64.0;
 	/** Hard ceiling for how long a mob may remember an unseen Elite target (20 seconds). */
 	public static final int MAX_MEMORY_TICKS = 400;
 	/** Vanilla melee mobs wait up to 20 ticks between "should I start chasing?" checks; Elite targets get 5. */
@@ -37,12 +37,17 @@ public final class EliteSurvival {
 		return vanillaInterval / (double) regenInterval(vanillaInterval, multiplier);
 	}
 
-	/** {@code base * multiplier}, never below {@code base}, never above {@link #ABSOLUTE_RANGE_CAP} unless {@code base} already is. */
-	public static double cappedRange(double base, double multiplier) {
-		if (!(multiplier > 1.0) || !Double.isFinite(multiplier) || !(base > 0.0) || !Double.isFinite(base)) {
+	/** {@code base * multiplier}, never below {@code base}, never above {@code cap} unless {@code base} already is. */
+	public static double cappedRange(double base, double multiplier, double cap) {
+		if (!(multiplier > 1.0) || !Double.isFinite(multiplier) || !(base > 0.0) || !Double.isFinite(base) || !(cap > 0.0) || !Double.isFinite(cap)) {
 			return base;
 		}
-		return Math.max(base, Math.min(base * multiplier, ABSOLUTE_RANGE_CAP));
+		return Math.max(base, Math.min(base * multiplier, cap));
+	}
+
+	/** {@link #cappedRange(double, double, double)} with the configured absolute cap. */
+	public static double cappedRange(double base, double multiplier, PdConfig.EliteAi ai) {
+		return cappedRange(base, multiplier, ai.absoluteRangeCap());
 	}
 
 	/**

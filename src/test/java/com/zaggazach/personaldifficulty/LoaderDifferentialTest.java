@@ -24,6 +24,12 @@ import org.junit.jupiter.api.io.TempDir;
  *
  * <p>The expectations here are never adapted to the implementation. A mismatch is a finding: investigate it, then fix the loader
  * (or, for an intended behaviour change, ask for approval).
+ *
+ * <p><b>Approved changes (1.4.0 plan, decision 6):</b> the Elite AI range multipliers may go up to 3.0 (was 2.0) and the memory
+ * multiplier up to 5.0 (was 4.0). For those three keys only, a value the 1.3.0 loader would have clamped (a finite number above
+ * its old maximum) is left out of the comparison; every other value, including every invalid spelling, is still compared, and the
+ * new limits are tested directly in {@code EliteSurvivalTest}. The new key {@code elite.ai.absolute-range-cap} is unknown to the
+ * 1.3.0 loader and is never part of the generated inputs.
  */
 class LoaderDifferentialTest {
 	/** Every scalar key, written out by hand (NOT taken from the registry, so the test is independent of it). */
@@ -68,7 +74,34 @@ class LoaderDifferentialTest {
 		return warning.contains(".damage-type.");
 	}
 
-	private static void compare(Properties p, String label) {
+	/** Key to the 1.3.0 maximum that 1.4.0 raised (approved, see the class comment). */
+	private static final java.util.Map<String, Double> RAISED_MAXIMUM = java.util.Map.of(
+		"elite.ai.acquisition-range-multiplier", 2.0, "elite.ai.follow-range-multiplier", 2.0, "elite.ai.target-memory-multiplier", 4.0);
+
+	/** A copy of {@code p} without values that only the approved raised maximums treat differently. */
+	private static Properties withoutApprovedChanges(Properties p) {
+		Properties q = new Properties();
+		for (String key : p.stringPropertyNames()) {
+			String value = p.getProperty(key);
+			Double oldMax = RAISED_MAXIMUM.get(key);
+			if (oldMax != null) {
+				double v;
+				try {
+					v = Double.parseDouble(value.trim());
+				} catch (NumberFormatException e) {
+					v = Double.NaN;
+				}
+				if (Double.isFinite(v) && v > oldMax) {
+					continue;
+				}
+			}
+			q.setProperty(key, value);
+		}
+		return q;
+	}
+
+	private static void compare(Properties original, String label) {
+		Properties p = withoutApprovedChanges(original);
 		LegacyConfigLoader.Result expected = LegacyConfigLoader.fromProperties(p);
 		PdConfigLoader.Result actual = PdConfigLoader.fromProperties(p);
 		assertEquals(expected.config(), actual.config(), "config differs for " + label + " " + p);

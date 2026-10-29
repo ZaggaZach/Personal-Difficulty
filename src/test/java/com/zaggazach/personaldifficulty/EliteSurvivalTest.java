@@ -42,17 +42,49 @@ class EliteSurvivalTest {
 
 	@Test
 	void rangesAreScaledButCappedAndNeverShrink() {
-		assertEquals(20.0, EliteSurvival.cappedRange(16, 1.25), 1e-9);
-		assertEquals(43.75, EliteSurvival.cappedRange(35, 1.25), 1e-9);
-		assertEquals(64.0, EliteSurvival.cappedRange(40, 2.0), "absolute cap");
-		assertEquals(64.0, EliteSurvival.cappedRange(64, 2.0), "a mob already at the cap gets nothing");
-		assertEquals(100.0, EliteSurvival.cappedRange(100, 2.0), "a mob whose own range exceeds the cap is never reduced");
+		double cap = EliteSurvival.LEGACY_RANGE_CAP;
+		assertEquals(20.0, EliteSurvival.cappedRange(16, 1.25, cap), 1e-9);
+		assertEquals(43.75, EliteSurvival.cappedRange(35, 1.25, cap), 1e-9);
+		assertEquals(64.0, EliteSurvival.cappedRange(40, 2.0, cap), "absolute cap");
+		assertEquals(64.0, EliteSurvival.cappedRange(64, 2.0, cap), "a mob already at the cap gets nothing");
+		assertEquals(100.0, EliteSurvival.cappedRange(100, 2.0, cap), "a mob whose own range exceeds the cap is never reduced");
 		for (double m : new double[] {1.0, 0.5, 0.0, -2.0, Double.NaN, Double.NEGATIVE_INFINITY}) {
-			assertEquals(35.0, EliteSurvival.cappedRange(35, m), "multiplier " + m + " cannot shrink or break a range");
+			assertEquals(35.0, EliteSurvival.cappedRange(35, m, cap), "multiplier " + m + " cannot shrink or break a range");
 		}
-		assertEquals(35.0, EliteSurvival.cappedRange(35, Double.POSITIVE_INFINITY), "infinity cannot create unlimited range");
-		assertEquals(0.0, EliteSurvival.cappedRange(0.0, 2.0));
-		assertTrue(Double.isNaN(EliteSurvival.cappedRange(Double.NaN, 2.0)), "garbage in a mob attribute is passed through untouched");
+		assertEquals(35.0, EliteSurvival.cappedRange(35, Double.POSITIVE_INFINITY, cap), "infinity cannot create unlimited range");
+		assertEquals(0.0, EliteSurvival.cappedRange(0.0, 2.0, cap));
+		assertTrue(Double.isNaN(EliteSurvival.cappedRange(Double.NaN, 2.0, cap)), "garbage in a mob attribute is passed through untouched");
+	}
+
+	@Test
+	void theAbsoluteCapIsASettingDefault128NeverBelowTheVanillaRange() {
+		PdConfig.EliteAi ai = PdConfig.defaults().eliteAi();
+		assertEquals(128, ai.absoluteRangeCap());
+		assertEquals(105.0, EliteSurvival.cappedRange(35, 3.0, ai), 1e-9, "3x a zombie's 35 blocks fits inside 128");
+		assertEquals(128.0, EliteSurvival.cappedRange(50, 3.0, ai), "but 3x 50 is capped at 128");
+		assertEquals(48.0, EliteSurvival.cappedRange(35, 3.0, 48), "a lower cap applies");
+		assertEquals(35.0, EliteSurvival.cappedRange(35, 3.0, 16), "a cap below the vanilla range never shrinks it");
+		for (double bad : new double[] {0, -1, Double.NaN, Double.POSITIVE_INFINITY}) {
+			assertEquals(35.0, EliteSurvival.cappedRange(35, 3.0, bad), "cap " + bad + " cannot create or break a range");
+		}
+		assertEquals(PdConfig.MIN_RANGE_CAP, PdConfigLoader.parse("elite.ai.absolute-range-cap=4").config().eliteAi().absoluteRangeCap(), "clamped to 16");
+		assertEquals(PdConfig.MAX_RANGE_CAP, PdConfigLoader.parse("elite.ai.absolute-range-cap=100000").config().eliteAi().absoluteRangeCap(), "clamped to 256");
+		assertEquals(64, PdConfigLoader.parse("elite.ai.absolute-range-cap=64").config().eliteAi().absoluteRangeCap(), "the 1.3.0 value is still available");
+	}
+
+	@Test
+	void theRaisedMultiplierLimitsOf140AreAccepted() {
+		PdConfig c = PdConfigLoader.parse("elite.ai.acquisition-range-multiplier=3
+elite.ai.follow-range-multiplier=2.5
+elite.ai.target-memory-multiplier=5").config();
+		assertEquals(3.0, c.eliteAi().acquisitionRangeMultiplier());
+		assertEquals(2.5, c.eliteAi().followRangeMultiplier());
+		assertEquals(5.0, c.eliteAi().targetMemoryMultiplier());
+		assertEquals(300, EliteSurvival.memoryTicks(60, 5.0), "60 ticks x 5 = 15 seconds, below the 400-tick ceiling");
+		PdConfig over = PdConfigLoader.parse("elite.ai.acquisition-range-multiplier=3.5
+elite.ai.target-memory-multiplier=6").config();
+		assertEquals(3.0, over.eliteAi().acquisitionRangeMultiplier(), "clamped to 3.0");
+		assertEquals(5.0, over.eliteAi().targetMemoryMultiplier(), "clamped to 5.0");
 	}
 
 	@Test

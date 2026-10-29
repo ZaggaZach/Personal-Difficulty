@@ -28,9 +28,17 @@ public record PdConfig(
 	public static final double MAX_UNCERTAINTY = 60.0;
 	/** Elite natural regeneration can be slowed down to a tenth, never sped up. */
 	public static final double MIN_REGEN_MULTIPLIER = 0.1;
-	/** Range multipliers may at most double a mob's own range (and are further capped, see EliteSurvival). */
-	public static final double MAX_AI_RANGE_MULTIPLIER = 2.0;
-	public static final double MAX_MEMORY_MULTIPLIER = 4.0;
+	/**
+	 * Range multipliers may at most triple a mob's own range, and never reach beyond {@link EliteAi#absoluteRangeCap()} (1.4.0
+	 * decision 6; 1.3.0 allowed 2.0).
+	 */
+	public static final double MAX_AI_RANGE_MULTIPLIER = 3.0;
+	/** 1.4.0 decision 6 (1.3.0 allowed 4.0); the memory itself is still capped at 400 ticks (see EliteSurvival). */
+	public static final double MAX_MEMORY_MULTIPLIER = 5.0;
+	/** Bounds and default of {@code elite.ai.absolute-range-cap}, in blocks (1.4.0; 1.3.0 had a fixed 64). */
+	public static final int MIN_RANGE_CAP = 16;
+	public static final int MAX_RANGE_CAP = 256;
+	public static final int DEFAULT_RANGE_CAP = 128;
 	public static final int MIN_SCAN_INTERVAL_TICKS = 5;
 	public static final int MAX_SCAN_INTERVAL_TICKS = 40;
 	public static final int MAX_REACQUIRE_SECONDS = 30;
@@ -63,14 +71,21 @@ public record PdConfig(
 	 *     toward an Elite target for melee mobs
 	 * @param targetMemoryMultiplier multiplier on the ticks a mob remembers an unseen Elite target (needs improvedPursuit)
 	 * @param advancedCombat skeletons fire at Elite players at their Hard-difficulty cadence on any world difficulty
+	 * @param absoluteRangeCap no Elite range adjustment ever reaches beyond this many blocks (unless the mob's own vanilla range
+	 *     already does); mobs only act in entity-ticking chunks, so the server's simulation distance is a further real limit
 	 */
 	public record EliteAi(
 		double acquisitionRangeMultiplier,
 		double followRangeMultiplier,
 		boolean improvedPursuit,
 		double targetMemoryMultiplier,
-		boolean advancedCombat
+		boolean advancedCombat,
+		int absoluteRangeCap
 	) {
+		/** The five-value form used before the cap became a setting (tests and the frozen 1.3.0 oracle); the cap is the default. */
+		public EliteAi(double acquisitionRangeMultiplier, double followRangeMultiplier, boolean improvedPursuit, double targetMemoryMultiplier, boolean advancedCombat) {
+			this(acquisitionRangeMultiplier, followRangeMultiplier, improvedPursuit, targetMemoryMultiplier, advancedCombat, DEFAULT_RANGE_CAP);
+		}
 	}
 
 	/**
@@ -124,7 +139,7 @@ public record PdConfig(
 			false,
 			false,
 			new RangedMobs(true, true, true, true, true, true),
-			new EliteAi(1.25, 1.25, true, 2.0, true),
+			new EliteAi(1.25, 1.25, true, 2.0, true, DEFAULT_RANGE_CAP),
 			new EliteHunt(true, 10, 8),
 			new EliteEffects(true, 30, new MobEffectSetting(0.35, 8), new MobEffectSetting(0.35, 5), new MobEffectSetting(0.50, 6),
 				new MobEffectSetting(0.25, 4), new MobEffectSetting(0.30, 3))

@@ -30,7 +30,8 @@ public final class ConfigAssembler {
 				b(values, "ranged.crossbow-mobs"), b(values, "ranged.piglins"), b(values, "ranged.witches")),
 			new PdConfig.EliteAi(
 				d(values, "elite.ai.acquisition-range-multiplier"), d(values, "elite.ai.follow-range-multiplier"),
-				b(values, "elite.ai.improved-pursuit"), d(values, "elite.ai.target-memory-multiplier"), b(values, "elite.ai.advanced-combat")),
+				b(values, "elite.ai.improved-pursuit"), d(values, "elite.ai.target-memory-multiplier"), b(values, "elite.ai.advanced-combat"),
+				i(values, "elite.ai.absolute-range-cap")),
 			new PdConfig.EliteHunt(
 				b(values, "elite.priority.enabled"), i(values, "elite.priority.scan-interval-ticks"), i(values, "elite.priority.reacquire-hidden-seconds")),
 			new PdConfig.EliteEffects(

@@ -68,7 +68,7 @@ class ConfigReportTest {
 		assertFalse(elite.contains("easy.damage-multiplier"), "other keys are filtered out");
 		assertTrue(elite.contains("starting with 'elite.'"));
 		String ai = String.join("\n", ConfigReport.table(st, s, "ELITE.AI."));
-		assertEquals(5, ai.lines().filter(l -> l.startsWith("elite.ai.")).count(), "case-insensitive; exactly the five AI keys");
+		assertEquals(6, ai.lines().filter(l -> l.startsWith("elite.ai.")).count(), "case-insensitive; exactly the six AI keys");
 		String none = String.join("\n", ConfigReport.table(st, s, "nothing"));
 		assertTrue(none.contains("No setting key starts with 'nothing'"), none);
 	}

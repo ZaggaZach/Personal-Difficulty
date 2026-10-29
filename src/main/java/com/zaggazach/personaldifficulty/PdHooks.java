@@ -257,7 +257,7 @@ public final class PdHooks {
 	/** Distance beyond which a mob gives up hunting {@code target}. */
 	public static double pursuitDistance(@Nullable LivingEntity target, double vanilla) {
 		PdConfig.EliteAi ai = eliteAiFor(target);
-		return ai == null ? vanilla : EliteSurvival.cappedRange(vanilla, EliteSurvival.pursuitFactor(ai));
+		return ai == null ? vanilla : EliteSurvival.cappedRange(vanilla, EliteSurvival.pursuitFactor(ai), ai);
 	}
 
 	/** How long (ticks) a mob remembers {@code target} while it cannot see it. */
@@ -269,7 +269,7 @@ public final class PdHooks {
 	/** Path-search length for a mob that is currently hunting an Elite player (its follow-range attribute is untouched). */
 	public static float maxPathLength(Mob mob, float vanilla) {
 		PdConfig.EliteAi ai = eliteAiFor(mob.getTarget());
-		return ai == null ? vanilla : (float) EliteSurvival.cappedRange(vanilla, EliteSurvival.pursuitFactor(ai));
+		return ai == null ? vanilla : (float) EliteSurvival.cappedRange(vanilla, EliteSurvival.pursuitFactor(ai), ai);
 	}
 
 	/** Melee mobs' "should I start chasing?" re-check delay. */
@@ -299,7 +299,7 @@ public final class PdHooks {
 			return null;
 		}
 		PdConfig.EliteAi ai = rt.config().eliteAi();
-		double extended = EliteSurvival.cappedRange(vanillaRange, ai.acquisitionRangeMultiplier());
+		double extended = EliteSurvival.cappedRange(vanillaRange, ai.acquisitionRangeMultiplier(), ai);
 		if (extended <= vanillaRange) {
 			return null;
 		}
