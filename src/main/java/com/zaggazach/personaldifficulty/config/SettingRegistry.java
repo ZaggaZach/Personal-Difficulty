@@ -111,6 +111,11 @@ public final class SettingRegistry {
 		e.add(flag(o += 10, "elite.priority.enabled", true, "Elite hunting: prefer Elite players", scan, "eliteHunt.priorityEnabled", c -> c.eliteHunt().priorityEnabled()));
 		e.add(whole(o += 10, "elite.priority.scan-interval-ticks", PdConfig.MIN_SCAN_INTERVAL_TICKS, PdConfig.MAX_SCAN_INTERVAL_TICKS, 10, "Elite hunting: scan interval (ticks)", scan, "eliteHunt.scanIntervalTicks", c -> c.eliteHunt().scanIntervalTicks()));
 		e.add(whole(o += 10, "elite.priority.reacquire-hidden-seconds", 0, PdConfig.MAX_REACQUIRE_SECONDS, 8, "Elite hunting: hidden-target re-acquire (seconds)", scan, "eliteHunt.reacquireHiddenSeconds", c -> c.eliteHunt().reacquireHiddenSeconds()));
+		// Elite alert network and last-known-position search (1.4.0)
+		e.add(flag(o += 10, "elite.alert.enabled", PdConfig.EliteAlert.DEFAULTS.enabled(), "Elite hunting: alert network and last-known search", scan, "eliteAlert.enabled", c -> c.eliteAlert().enabled()));
+		e.add(whole(o += 10, "elite.alert.radius", PdConfig.MIN_ALERT_RADIUS, PdConfig.MAX_ALERT_RADIUS, PdConfig.EliteAlert.DEFAULTS.radius(), "Elite hunting: alert radius (blocks)", scan, "eliteAlert.radius", c -> c.eliteAlert().radius()));
+		e.add(whole(o += 10, "elite.alert.hops", 0, PdConfig.MAX_ALERT_HOPS, PdConfig.EliteAlert.DEFAULTS.hops(), "Elite hunting: alert hops", scan, "eliteAlert.hops", c -> c.eliteAlert().hops()));
+		e.add(whole(o += 10, "elite.alert.memory-seconds", PdConfig.MIN_ALERT_MEMORY_SECONDS, PdConfig.MAX_ALERT_MEMORY_SECONDS, PdConfig.EliteAlert.DEFAULTS.memorySeconds(), "Elite hunting: alert memory (seconds)", scan, "eliteAlert.memorySeconds", c -> c.eliteAlert().memorySeconds()));
 		// Elite mob effects
 		e.add(flag(o += 10, "elite.effects.enabled", true, "Elite effects: enabled", live, "eliteEffects.enabled", c -> c.eliteEffects().enabled()));
 		e.add(whole(o += 10, "elite.effects.max-duration-seconds", 1, PdConfig.MAX_EFFECT_SECONDS, 30, "Elite effects: maximum duration (seconds)", live, "eliteEffects.maxDurationSeconds", c -> c.eliteEffects().maxDurationSeconds()));

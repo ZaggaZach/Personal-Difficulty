@@ -1,10 +1,16 @@
 package com.zaggazach.personaldifficulty.mixin;
 
 import com.zaggazach.personaldifficulty.PdHunt;
+import com.zaggazach.personaldifficulty.PdLastKnownGoal;
 import com.zaggazach.personaldifficulty.logic.HuntingMob;
 import com.zaggazach.personaldifficulty.logic.PlayerTargetingGoal;
 import java.util.UUID;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.entity.ai.goal.GoalSelector;
 import net.minecraft.world.entity.ai.goal.WrappedGoal;
 import org.jspecify.annotations.Nullable;
@@ -23,6 +29,10 @@ abstract class MobHuntMixin implements HuntingMob {
 	@Final
 	protected GoalSelector targetSelector;
 
+	@Shadow
+	@Final
+	protected GoalSelector goalSelector;
+
 	/** 0 = not computed, 1 = hunts players, 2 = does not. */
 	@Unique
 	private byte personaldifficulty$huntsPlayers;
@@ -34,6 +44,22 @@ abstract class MobHuntMixin implements HuntingMob {
 	private int personaldifficulty$unseenTicks;
 	@Unique
 	private @Nullable UUID personaldifficulty$ownedTarget;
+	@Unique
+	private @Nullable UUID personaldifficulty$searchedPlayer;
+	@Unique
+	private long personaldifficulty$searchedTick;
+
+	/**
+	 * Every hostile pathfinding mob gets the last-known-position goal (Phase 5), right after its own goals were registered (vanilla
+	 * registers goals at the end of this constructor, on the server only). Whether it ever runs is decided live, in its canUse: the
+	 * setting, the mob's family and whether there is anything to search.
+	 */
+	@Inject(method = "<init>", at = @At("TAIL"))
+	private void personaldifficulty$addLastKnownGoal(EntityType<? extends Mob> type, Level level, CallbackInfo ci) {
+		if (level instanceof ServerLevel && (Object) this instanceof PathfinderMob mob && (Object) this instanceof Monster) {
+			this.goalSelector.addGoal(PdLastKnownGoal.priorityFor(mob), new PdLastKnownGoal(mob));
+		}
+	}
 
 	@Inject(method = "serverAiStep", at = @At("HEAD"))
 	private void personaldifficulty$preferEliteTargets(CallbackInfo ci) {
@@ -83,6 +109,22 @@ abstract class MobHuntMixin implements HuntingMob {
 	@Override
 	public void personaldifficulty$setUnseenTicks(int ticks) {
 		this.personaldifficulty$unseenTicks = ticks;
+	}
+
+	@Override
+	public @Nullable UUID personaldifficulty$searchedPlayer() {
+		return this.personaldifficulty$searchedPlayer;
+	}
+
+	@Override
+	public long personaldifficulty$searchedTick() {
+		return this.personaldifficulty$searchedTick;
+	}
+
+	@Override
+	public void personaldifficulty$markSearched(UUID player, long sightingTick) {
+		this.personaldifficulty$searchedPlayer = player;
+		this.personaldifficulty$searchedTick = sightingTick;
 	}
 
 	@Override

@@ -1,0 +1,11 @@
+--release
+21
+-d
+/tmp/claude-0/-home-claude/76de14cd-8577-58f0-91c7-7600fb0c8745/scratchpad/ab/out
+/tmp/claude-0/-home-claude/76de14cd-8577-58f0-91c7-7600fb0c8745/scratchpad/ab/stub/org/junit/jupiter/api/Assertions.java
+/tmp/claude-0/-home-claude/76de14cd-8577-58f0-91c7-7600fb0c8745/scratchpad/ab/stub/org/junit/jupiter/api/Test.java
+src/main/java/com/zaggazach/personaldifficulty/logic/AlertBoard.java
+src/test/java/com/zaggazach/personaldifficulty/AlertBoardTest.java
+/tmp/claude-0/-home-claude/76de14cd-8577-58f0-91c7-7600fb0c8745/scratchpad/ab/Run.java
+-cp
+/dev/null

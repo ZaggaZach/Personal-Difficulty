@@ -1,9 +1,11 @@
 package com.zaggazach.personaldifficulty;
 
 import com.zaggazach.personaldifficulty.config.PdConfig;
+import com.zaggazach.personaldifficulty.logic.AlertBoard;
 import com.zaggazach.personaldifficulty.logic.EliteSurvival;
 import com.zaggazach.personaldifficulty.logic.HuntingMob;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -47,6 +49,8 @@ public final class PdHunt {
 	private static final TargetingConditions SIGHT = TargetingConditions.forCombat();
 	private static final TargetingConditions BLIND = TargetingConditions.forCombat().ignoreLineOfSight();
 	private static final WeakHashMap<ServerLevel, Cached> CACHE = new WeakHashMap<>();
+	/** One alert board per level (Phase 5); it holds only UUIDs, positions and ticks, and dies with the level. */
+	private static final WeakHashMap<ServerLevel, AlertBoard> BOARDS = new WeakHashMap<>();
 
 	/** Valid for one game tick, one player count and one generation of mode selections (a switch invalidates it at once). */
 	private record Cached(long tick, int players, int generation, List<ServerPlayer> elites) {
@@ -138,7 +142,7 @@ public final class PdHunt {
 		if (isLiveEliteTarget(rt, current)) {
 			ServerPlayer hunted = (ServerPlayer) current;
 			if (mob.getSensing().hasLineOfSight(hunted)) {
-				memory.personaldifficulty$rememberElite(hunted.getUUID(), level.getGameTime());
+				saw(rt, level, mob, memory, hunted);
 			}
 			return; // stable: never swap one Elite target for another
 		}
@@ -158,6 +162,77 @@ public final class PdHunt {
 		}
 	}
 
+	/** The mob has line of sight to an Elite player right now: remember it, and (alert network on) record the sighting. */
+	private static void saw(PdRuntime rt, ServerLevel level, Mob mob, HuntingMob memory, ServerPlayer player) {
+		memory.personaldifficulty$rememberElite(player.getUUID(), level.getGameTime());
+		if (rt.config().eliteAlert().enabled()) {
+			board(level).sighted(player.getUUID(), player.getX(), player.getY(), player.getZ(), mob.getId(), mob.getX(), mob.getY(), mob.getZ(), level.getGameTime());
+		}
+	}
+
+	static AlertBoard board(ServerLevel level) {
+		return BOARDS.computeIfAbsent(level, l -> new AlertBoard());
+	}
+
+	/**
+	 * Phase 5: the remembered point this idle mob should search, or null. The mob must take part in hunting and have no target;
+	 * the player must still be an eligible Elite player in this level; the point must lie within the absolute range cap of the
+	 * mob. A point that is out of reach is marked as searched so it is not offered again.
+	 */
+	public static AlertBoard.@Nullable Known lastKnown(Mob mob) {
+		PdRuntime rt = PdRuntime.get();
+		if (rt == null || !(mob.level() instanceof ServerLevel level) || !mob.isAlive() || mob.getTarget() != null) {
+			return null;
+		}
+		PdConfig.EliteAlert cfg = rt.config().eliteAlert();
+		if (!cfg.enabled() || !participates(mob) || (mob instanceof Spider && mob.getLightLevelDependentMagicValue() >= 0.5F)) {
+			return null;
+		}
+		AlertBoard board = BOARDS.get(level);
+		if (board == null || board.size() == 0) {
+			return null;
+		}
+		List<ServerPlayer> elites = elites(level, rt);
+		if (elites.isEmpty()) {
+			return null;
+		}
+		Set<UUID> eligible = new HashSet<>();
+		for (ServerPlayer p : elites) {
+			eligible.add(p.getUUID());
+		}
+		HuntingMob memory = (HuntingMob) mob;
+		AlertBoard.Known k = board.learn(mob.getId(), mob.getX(), mob.getY(), mob.getZ(), level.getGameTime(), cfg.radius(), cfg.hops(),
+			cfg.memorySeconds() * 20L, eligible, memory.personaldifficulty$searchedPlayer(), memory.personaldifficulty$searchedTick());
+		if (k == null) {
+			return null;
+		}
+		double cap = rt.config().eliteAi().absoluteRangeCap();
+		if (mob.distanceToSqr(k.x(), k.y(), k.z()) > cap * cap) {
+			memory.personaldifficulty$markSearched(k.player(), k.tick());
+			return null;
+		}
+		return k;
+	}
+
+	/** True while {@code player} is still an Elite player this mob may hunt in its level (alive, online there, not a spectator). */
+	public static boolean stillEligible(Mob mob, UUID player) {
+		PdRuntime rt = PdRuntime.get();
+		if (rt == null || !(mob.level() instanceof ServerLevel level)) {
+			return false;
+		}
+		for (ServerPlayer p : elites(level, rt)) {
+			if (p.getUUID().equals(player)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Test and diagnostics access: the board of a level, or null if no sighting was ever recorded there. */
+	public static @Nullable AlertBoard boardOf(ServerLevel level) {
+		return BOARDS.get(level);
+	}
+
 	/** Vanilla's rules for keeping a target (alive, within range, not out of sight too long), with the Elite extensions. */
 	private static boolean stillValid(PdRuntime rt, Mob mob, ServerLevel level, LivingEntity target, HuntingMob memory, PdConfig.EliteHunt cfg) {
 		if (!target.isAlive() || target.isRemoved()) {
@@ -167,7 +242,7 @@ public final class PdHunt {
 		if (mob.getSensing().hasLineOfSight(target)) {
 			memory.personaldifficulty$setUnseenTicks(0);
 			if (elite) {
-				memory.personaldifficulty$rememberElite(target.getUUID(), level.getGameTime());
+				saw(rt, level, mob, memory, (ServerPlayer) target);
 			}
 		} else {
 			memory.personaldifficulty$setUnseenTicks(memory.personaldifficulty$unseenTicks() + cfg.scanIntervalTicks());

@@ -26,4 +26,11 @@ public interface HuntingMob {
 	int personaldifficulty$unseenTicks();
 
 	void personaldifficulty$setUnseenTicks(int ticks);
+
+	/** The player whose alert-board sighting this mob last searched (null if none), and that sighting's game tick. */
+	@Nullable UUID personaldifficulty$searchedPlayer();
+
+	long personaldifficulty$searchedTick();
+
+	void personaldifficulty$markSearched(UUID player, long sightingTick);
 }

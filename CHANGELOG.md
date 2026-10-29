@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: Phase 5 of the 1.4.0 line (Elite hunting core), in progress
+
+### Added so far
+* `elite.ai.absolute-range-cap` (default **128** blocks, 16 .. 256) replaces the fixed 64-block cap of 1.3.0.
+* The Elite range multipliers may now go up to **3.0** (were 2.0) and the memory multiplier up to **5.0** (was 4.0). The
+  defaults are unchanged for now (1.25 and 2.0); they move to 3.0 and 5.0 at the end of Phase 5, after the performance
+  measurement.
+* **Alert network and last-known-position search** (`elite.alert.enabled`, OFF by default for now; `elite.alert.radius` 64,
+  `elite.alert.hops` 2, `elite.alert.memory-seconds` 60): a mob that SEES an Elite player records where and when; hostile mobs
+  near it learn of that sighting (passed on at most `hops` times) and, if they have no target, walk to that remembered point with
+  ordinary pathfinding, re-planning from the end of a partial route for up to 30 seconds. Nobody is told where the player is
+  now. Each mob searches a sighting once. The board is bounded (64 players per level, 32 relay mobs per sighting).
+* All new settings are on the "Elite hunting and effects" settings page.
+
+### Tests so far
+* Unit: the alert board (radius edge, hop limit, expiry, caps, staleness, eligibility, once-only search); the raised limits and
+  the cap; the differential loader test leaves out only values above the old maximums of the three raised keys.
+* GameTests: a live listener zombie walks to where a sentry saw an Elite player and not to where the player hid; a Normal
+  player's sighting is never passed on; nothing happens with the setting off. These run in their own test environment
+  (`personaldifficulty-gametest:elite_alerts`), which switches the feature on only for that batch.
+* A witch diagnostic GameTest (reports only, never fails) for the plan's witch root-cause step.
+
 ## 1.3.1-rc.3: UNPUBLISHED development checkpoint (Phase 4 of the 1.4.0 line: Settings in the admin menu)
 
 > **Status: a private checkpoint, NOT published.** Builds on `1.3.1-rc.2`.

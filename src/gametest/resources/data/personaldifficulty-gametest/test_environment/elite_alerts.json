@@ -1,0 +1,5 @@
+{
+	"type": "minecraft:function",
+	"setup": "personaldifficulty-gametest:alerts_on",
+	"teardown": "personaldifficulty-gametest:alerts_off"
+}

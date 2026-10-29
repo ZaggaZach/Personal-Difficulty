@@ -38,7 +38,9 @@ public final class ConfigAssembler {
 				b(values, "elite.effects.enabled"), i(values, "elite.effects.max-duration-seconds"),
 				effect(values, "elite.effects.zombie-infection"), effect(values, "elite.effects.spider-venom"),
 				effect(values, "elite.effects.cave-spider-venom"), effect(values, "elite.effects.skeleton-shot"),
-				effect(values, "elite.effects.drowned-chill"))
+				effect(values, "elite.effects.drowned-chill")),
+			new PdConfig.EliteAlert(
+				b(values, "elite.alert.enabled"), i(values, "elite.alert.radius"), i(values, "elite.alert.hops"), i(values, "elite.alert.memory-seconds"))
 		);
 	}
 

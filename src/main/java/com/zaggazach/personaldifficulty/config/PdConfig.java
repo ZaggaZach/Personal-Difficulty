@@ -22,8 +22,19 @@ public record PdConfig(
 	RangedMobs rangedMobs,
 	EliteAi eliteAi,
 	EliteHunt eliteHunt,
-	EliteEffects eliteEffects
+	EliteEffects eliteEffects,
+	EliteAlert eliteAlert
 ) {
+	/** The form used before the alert network existed (tests and the frozen 1.3.0 oracle); the alert settings are the defaults. */
+	public PdConfig(Profile easy, Profile hard, Profile elite, double easyRangedMinUncertainty, double eliteRangedMaxUncertainty,
+		double eliteArmorEffectiveness, double eliteRegenMultiplier, double pvpDamageMultiplier, double selfDamageMultiplier,
+		boolean environmentalApplyProfile, boolean voidApplyProfile, boolean adminApplyProfile, RangedMobs rangedMobs, EliteAi eliteAi,
+		EliteHunt eliteHunt, EliteEffects eliteEffects) {
+		this(easy, hard, elite, easyRangedMinUncertainty, eliteRangedMaxUncertainty, eliteArmorEffectiveness, eliteRegenMultiplier,
+			pvpDamageMultiplier, selfDamageMultiplier, environmentalApplyProfile, voidApplyProfile, adminApplyProfile, rangedMobs, eliteAi,
+			eliteHunt, eliteEffects, EliteAlert.DEFAULTS);
+	}
+
 	public static final double MAX_MULTIPLIER = 10.0;
 	public static final double MAX_UNCERTAINTY = 60.0;
 	/** Elite natural regeneration can be slowed down to a tenth, never sped up. */
@@ -39,6 +50,12 @@ public record PdConfig(
 	public static final int MIN_RANGE_CAP = 16;
 	public static final int MAX_RANGE_CAP = 256;
 	public static final int DEFAULT_RANGE_CAP = 128;
+	/** Bounds of the alert network settings (1.4.0, Phase 5). */
+	public static final int MIN_ALERT_RADIUS = 8;
+	public static final int MAX_ALERT_RADIUS = 128;
+	public static final int MAX_ALERT_HOPS = 4;
+	public static final int MIN_ALERT_MEMORY_SECONDS = 5;
+	public static final int MAX_ALERT_MEMORY_SECONDS = 300;
 	public static final int MIN_SCAN_INTERVAL_TICKS = 5;
 	public static final int MAX_SCAN_INTERVAL_TICKS = 40;
 	public static final int MAX_REACQUIRE_SECONDS = 30;
@@ -100,6 +117,20 @@ public record PdConfig(
 	public record EliteHunt(boolean priorityEnabled, int scanIntervalTicks, int reacquireHiddenSeconds) {
 	}
 
+	/**
+	 * The alert network and last-known-position search (1.4.0, Phase 5). A mob that SEES an Elite player records where and when;
+	 * hostile mobs nearby learn of that sighting (a few hops at most) and, if they have no target, walk to that remembered point
+	 * with their ordinary pathfinding. Nobody learns where the player is now: the point goes stale as soon as they move.
+	 *
+	 * @param enabled master switch (off by default until the Phase 5 performance measurement)
+	 * @param radius blocks within which a mob that knows of a sighting passes it on
+	 * @param hops how many times a sighting may be passed on (0 = only the mob that saw it searches)
+	 * @param memorySeconds how long a sighting is kept
+	 */
+	public record EliteAlert(boolean enabled, int radius, int hops, int memorySeconds) {
+		public static final EliteAlert DEFAULTS = new EliteAlert(false, 64, 2, 60);
+	}
+
 	/** One attacker family's effect: probability per successful hit and base duration. */
 	public record MobEffectSetting(double chance, int seconds) {
 	}
@@ -142,7 +173,8 @@ public record PdConfig(
 			new EliteAi(1.25, 1.25, true, 2.0, true, DEFAULT_RANGE_CAP),
 			new EliteHunt(true, 10, 8),
 			new EliteEffects(true, 30, new MobEffectSetting(0.35, 8), new MobEffectSetting(0.35, 5), new MobEffectSetting(0.50, 6),
-				new MobEffectSetting(0.25, 4), new MobEffectSetting(0.30, 3))
+				new MobEffectSetting(0.25, 4), new MobEffectSetting(0.30, 3)),
+			EliteAlert.DEFAULTS
 		);
 	}
 }
