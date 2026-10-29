@@ -97,6 +97,12 @@ public class AdminMenuGameTests {
 	// ---- the 1.3.1-rc.2 layout (see AdminMenu): one player page, a fixed navigation bar
 	private static final int HUB_PLAYERS = 20;
 	private static final int HUB_DIFFICULTIES = 24;
+	private static final int HUB_SETTINGS = 22;
+	private static final int SETTINGS_EASY = 20;
+	private static final int SETTINGS_GENERAL = 30;
+	private static final int SETTINGS_ADVANCED = 32;
+	private static final int PAGE_RESET = 0;
+	private static final int PREV = 52;
 	private static final int SAVE = 35;
 	private static final int LOCK = 38;
 	private static final int ALLOW_ALL = 40;
@@ -109,6 +115,11 @@ public class AdminMenuGameTests {
 	private static final int BACK = 45;
 	private static final int CLOSE = 49;
 	private static final int NEXT = 53;
+
+	/** Settings page: the first slot ([-]) of the {@code i}-th setting shown; then value, [+], reset. */
+	private static int settingBase(int i) {
+		return (1 + i / 2) * 9 + (i % 2 == 0 ? 0 : 5);
+	}
 
 	/** Player page, "Set difficulty" row. */
 	private static int set(PersonalDifficultyMode m) {
@@ -648,7 +659,7 @@ public class AdminMenuGameTests {
 			open(admin);
 			String before = snapshot(server);
 			for (int slot = 0; slot < admin.containerMenu.slots.size(); slot++) {
-				if (slot == 20 || slot == 24 || slot == 49) {
+				if (slot == 20 || slot == 22 || slot == 24 || slot == 49) {
 					continue; // real buttons
 				}
 				admin.containerMenu.clicked(slot, 0, ContainerInput.PICKUP, admin);
@@ -860,6 +871,139 @@ public class AdminMenuGameTests {
 			Outcome out = run(server, "personaldifficulty admin restrict 0am_rcmp_nochoice hard,elite", console(server, cap), cap);
 			check(out.result() == 0 && out.output().contains("Re-run with 'switch'") && rec(refused).allowed() == null, "the command without a choice refuses and stores nothing: " + out);
 		} finally {
+			finish();
+		}
+		h.succeed();
+	}
+
+	// ------------------------------------------------------------------ settings (Phase 4)
+
+	private static com.zaggazach.personaldifficulty.config.SettingDef def(String key) {
+		return com.zaggazach.personaldifficulty.config.SettingRegistry.find(key).orElseThrow();
+	}
+
+	private static boolean overridden(String key) {
+		return rt().state().sourceOf(def(key)) == com.zaggazach.personaldifficulty.config.ConfigState.Source.OVERRIDE;
+	}
+
+	private static String readFile(Path p) {
+		try {
+			return Files.exists(p) ? Files.readString(p) : "";
+		} catch (IOException e) {
+			throw new AssertionError(e);
+		}
+	}
+
+	@GameTest
+	public void admin_settings_stepAndResetMatchTheCommand_boundsAreRefused_andThePropertiesFileIsNeverWritten(GameTestHelper h) {
+		MinecraftServer server = h.getLevel().getServer();
+		ServerPlayer admin = op(h, "0am_set_op");
+		ConfigCommandGameTests.cleanOverrides();
+		String propsBefore = readFile(rt().configFile());
+		try {
+			Recorder feedback = open(admin);
+			click(admin, HUB_SETTINGS);
+			check(label(admin, SETTINGS_EASY).equals("Easy") && label(admin, SETTINGS_GENERAL).equals("All difficulties")
+				&& label(admin, SETTINGS_ADVANCED).equals("Elite hunting and effects") && label(admin, BACK).equals("Back"), "the settings hub: " + label(admin, SETTINGS_EASY));
+			click(admin, SETTINGS_EASY);
+			int minus = settingBase(0);
+			int value = minus + 1;
+			int plus = minus + 2;
+			int reset = minus + 3;
+			check(label(admin, value).equals("Damage taken multiplier: 0.6"), "the first Easy setting: " + label(admin, value));
+			check(label(admin, minus).equals("- 0.05") && label(admin, plus).equals("+ 0.05"), "step buttons: " + label(admin, minus) + " / " + label(admin, plus));
+			check(label(admin, reset).isEmpty() && label(admin, PAGE_RESET).isEmpty(), "no reset buttons without an override");
+
+			// what the command says for the same change, from the same starting state
+			Capture cap = new Capture();
+			Outcome viaCommand = run(server, "personaldifficulty admin set easy.damage-multiplier 0.65", console(server, cap), cap);
+			check(viaCommand.result() == 1, "command: " + viaCommand);
+			rt().unsetValue("easy.damage-multiplier");
+
+			click(admin, plus);
+			check(rt().config().easy().damageMultiplier() == 0.65, "+ applied: " + rt().config().easy().damageMultiplier());
+			check(feedback.messages.size() == 1 && feedback.broadcasts == 1, "one message, broadcast like the command: " + feedback.messages);
+			check(norm(feedback.messages.get(0)).equals(norm(viaCommand.output())), "same message. command=" + viaCommand.output() + " menu=" + feedback.messages.get(0));
+			check(label(admin, value).equals("Damage taken multiplier: 0.65") && label(admin, reset).equals("Reset") && overridden("easy.damage-multiplier"), "shown as an override with a reset button");
+
+			click(admin, minus);
+			check(rt().config().easy().damageMultiplier() == 0.6 && !overridden("easy.damage-multiplier"), "- then + is back where it started, and no override is stored for an equal value");
+
+			admin.containerMenu.clicked(plus, 0, ContainerInput.QUICK_MOVE, admin);
+			check(rt().config().easy().damageMultiplier() == 1.1, "shift-click: ten steps: " + rt().config().easy().damageMultiplier());
+			int messages = feedback.messages.size();
+			for (int slot : new int[] {value, reset, PAGE_RESET, 4, 8, BACK, CLOSE, 13, 30, 44}) {
+				admin.containerMenu.clicked(slot, 0, ContainerInput.QUICK_MOVE, admin);
+			}
+			check(rt().config().easy().damageMultiplier() == 1.1 && feedback.messages.size() == messages && label(admin, value).equals("Damage taken multiplier: 1.1") && isMenu(admin),
+				"a shift-click anywhere but a -/+ button does nothing (not even close or back)");
+
+			click(admin, reset);
+			check(rt().config().easy().damageMultiplier() == 0.6 && !overridden("easy.damage-multiplier"), "Reset removes the override");
+
+			// clicking past a bound is refused and changes nothing
+			rt().setValue("easy.damage-multiplier", "0");
+			messages = feedback.messages.size();
+			click(admin, minus);
+			check(rt().config().easy().damageMultiplier() == 0.0 && feedback.messages.size() == messages + 1 && feedback.messages.get(messages).contains("minimum"),
+				"refused at the minimum: " + feedback.messages);
+
+			// the page reset asks first, and Cancel keeps everything
+			rt().setValue("easy.hunger-multiplier", "0.7");
+			click(admin, PAGE_RESET);
+			check(label(admin, CONFIRM_LEFT).equals("Yes, reset"), "asks: " + label(admin, CONFIRM_LEFT));
+			click(admin, CONFIRM_RIGHT);
+			check(overridden("easy.damage-multiplier") && overridden("easy.hunger-multiplier") && label(admin, value).startsWith("Damage taken multiplier"), "Cancel: both overrides kept, back on the page");
+			click(admin, PAGE_RESET);
+			click(admin, CONFIRM_LEFT);
+			check(!overridden("easy.damage-multiplier") && !overridden("easy.hunger-multiplier") && rt().overrides().layer().size() == 0, "the page reset removed both");
+
+			// an on/off setting on the second page of "All difficulties"
+			click(admin, BACK);
+			click(admin, SETTINGS_GENERAL);
+			check(label(admin, PREV).isEmpty(), "no previous page on the first page");
+			click(admin, NEXT);
+			int toggle = -1;
+			for (int slot = 9; slot < 45; slot++) {
+				if (label(admin, slot).startsWith("Profile applies to void damage")) {
+					toggle = slot;
+				}
+			}
+			check(toggle >= 0, "void.apply-profile is on the second page");
+			boolean before = rt().config().voidApplyProfile();
+			click(admin, toggle);
+			check(rt().config().voidApplyProfile() == !before && label(admin, toggle).endsWith(before ? ": OFF" : ": ON"), "toggled: " + label(admin, toggle));
+			click(admin, toggle);
+			check(rt().config().voidApplyProfile() == before && !overridden("void.apply-profile"), "toggled back, no override left");
+			click(admin, toggle - 1);
+			click(admin, toggle + 1);
+			check(rt().config().voidApplyProfile() == before, "an on/off setting has no -/+ buttons");
+
+			check(readFile(rt().configFile()).equals(propsBefore), "the properties file is never written by the menu");
+		} finally {
+			ConfigCommandGameTests.cleanOverrides();
+			finish();
+		}
+		h.succeed();
+	}
+
+	@GameTest
+	public void admin_settings_aDemotedOperatorCannotChangeASetting(GameTestHelper h) {
+		ServerPlayer admin = op(h, "0am_set_demote");
+		ConfigCommandGameTests.cleanOverrides();
+		try {
+			open(admin);
+			click(admin, HUB_SETTINGS);
+			click(admin, SETTINGS_EASY);
+			var menu = admin.containerMenu;
+			deop(admin);
+			menu.clicked(settingBase(0) + 2, 0, ContainerInput.PICKUP, admin);
+			menu.clicked(settingBase(0) + 2, 0, ContainerInput.QUICK_MOVE, admin);
+			check(rt().overrides().layer().size() == 0 && rt().config().easy().damageMultiplier() == 0.6, "nothing changed");
+			admin.doTick();
+			check(admin.containerMenu == admin.inventoryMenu, "and the screen is closed on the next tick");
+		} finally {
+			ConfigCommandGameTests.cleanOverrides();
 			finish();
 		}
 		h.succeed();

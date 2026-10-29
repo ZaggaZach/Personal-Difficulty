@@ -334,4 +334,44 @@ class AdminServiceTest {
 		assertTrue(AdminService.enableAll(a, f.rt()).applied());
 		assertEquals(Outcome.UNCHANGED, AdminService.enableAll(a, f.rt()).outcome());
 	}
+
+	// ------------------------------------------------------------------ settings (Phase 4: the Settings menu's path)
+
+	@Test
+	void settingChangesRefuseAnActorWithoutAuthority_andWriteNothing(@TempDir Path dir) throws IOException {
+		Fixture f = fixture(dir);
+		f.authorised().set(false);
+		AdminActor a = f.actor();
+		assertEquals(Outcome.UNAUTHORISED, AdminService.setSetting(a, f.rt(), "easy.damage-multiplier", "0.65").outcome());
+		assertEquals(Outcome.UNAUTHORISED, AdminService.unsetSetting(a, f.rt(), "easy.damage-multiplier").outcome());
+		assertFalse(Files.exists(dir.resolve("o.json")), "no overrides file was written");
+		assertEquals(0.60, f.rt().config().easy().damageMultiplier());
+		assertEquals(2, f.feedback().failures.size());
+	}
+
+	@Test
+	void settingChangesReportLikeTheCommands_broadcastOnlyWhenSomethingChanged_andNeverTouchThePropertiesFile(@TempDir Path dir) throws IOException {
+		Fixture f = fixture(dir);
+		AdminActor a = f.actor();
+		byte[] props = Files.readAllBytes(dir.resolve("p.properties"));
+		AdminResult set = AdminService.setSetting(a, f.rt(), "easy.damage-multiplier", "0.65");
+		assertEquals(Outcome.APPLIED, set.outcome(), set.message());
+		assertEquals(0.65, f.rt().config().easy().damageMultiplier());
+		assertEquals(List.of(true), f.feedback().broadcasts, "a change is broadcast once");
+		assertEquals(Outcome.UNCHANGED, AdminService.setSetting(a, f.rt(), "easy.damage-multiplier", "0.65").outcome());
+		assertEquals(Outcome.REFUSED, AdminService.setSetting(a, f.rt(), "easy.damage-multiplier", "999").outcome());
+		assertEquals(0.65, f.rt().config().easy().damageMultiplier(), "a refused value changes nothing");
+		// stepping back to the lower value removes the override instead of storing an equal one
+		AdminResult back = AdminService.setSetting(a, f.rt(), "easy.damage-multiplier", "0.6");
+		assertEquals(Outcome.APPLIED, back.outcome(), back.message());
+		assertEquals(com.zaggazach.personaldifficulty.config.ConfigState.Source.DEFAULT,
+			f.rt().state().sourceOf(com.zaggazach.personaldifficulty.config.SettingRegistry.find("easy.damage-multiplier").orElseThrow()));
+		assertEquals(Outcome.UNCHANGED, AdminService.unsetSetting(a, f.rt(), "easy.damage-multiplier").outcome(), "nothing left to remove");
+		AdminService.setSetting(a, f.rt(), "void.apply-profile", "true");
+		assertEquals(Outcome.APPLIED, AdminService.unsetSetting(a, f.rt(), "void.apply-profile").outcome());
+		// set (changed), set (same), [refused], set back (changed), unset (nothing), set void (changed), unset void (changed)
+		assertEquals(List.of(true, false, true, false, true, true), f.feedback().broadcasts, "broadcast exactly when something changed");
+		assertEquals(1, f.feedback().failures.size(), "one refusal: " + f.feedback().failures);
+		assertArrayEquals(props, Files.readAllBytes(dir.resolve("p.properties")), "the properties file is never written");
+	}
 }

@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.3.1-rc.3: UNPUBLISHED development checkpoint (Phase 4 of the 1.4.0 line: Settings in the admin menu)
+
+> **Status: in development, NOT published, NOT yet tested in a graphical client.** Builds on `1.3.1-rc.2`.
+
+### Added
+* **Settings** in the admin menu (main menu, middle button), so settings can be changed without editing files:
+  * a settings page each for **Easy**, **Hard** and **Elite**, one for settings that apply to **all difficulties** (PvP and
+    self-damage, which kinds of damage the profile applies to, which ranged mobs have their aim adjusted) and one for **Elite
+    hunting and effects**; Normal and Peaceful have nothing to adjust, which the Settings page explains;
+  * every number has **- and +** buttons (shift-click for ten steps); an on/off setting is a single toggle;
+  * each setting shows its value in force, where it comes from (default, properties file or override), its default, its range,
+    when a change applies and its key for the `admin set` command; an override glows and has a **Reset** brush next to it;
+  * **Reset this page** removes every override on the page, after asking;
+  * long pages (All difficulties, Elite hunting and effects) have page arrows.
+* Every menu change goes through the same strict path as `admin set/unset`: validated, saved to
+  `config/personaldifficulty-overrides.json`, then applied; the same message and operator broadcast; the properties file is never
+  written. A value equal to the properties file or default removes the override instead of storing it, so - then + leaves no
+  override behind. Clicking past a setting's limit is refused and changes nothing.
+* Permission is re-checked on every click and again before every change; a demoted operator's settings page closes on the next tick.
+* Shift-click is accepted only on the - and + buttons of a settings page; everywhere else it still does nothing.
+
+### Not in the menu
+* Per-damage-type multipliers (`<mode>.damage-type.<id>`) stay command-only (`admin set`), because their keys are open-ended.
+
+### Tests
+* Unit: every setting is on exactly one page; exact decimal steps; bounds; - then + round trip over thousands of values;
+  `AdminService.setSetting/unsetSetting` authority, reporting and "the properties file is never written".
+* GameTests: menu step, shift-step, reset, page reset with Cancel, bound refusal, on/off toggle, message parity with
+  `admin set`, properties file unchanged, demotion.
+* `AdminGuiE2eTest` updated for the rc.2 layout.
+
 ## 1.3.1-rc.2: UNPUBLISHED release candidate (admin menu redesign after the first graphical-client test)
 
 > **Status: a private checkpoint, NOT published.** Built from `1.3.1-rc.1` (commit `5d40840`) after testing that RC's admin menu in a

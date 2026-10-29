@@ -42,7 +42,7 @@ public class ConfigCommandGameTests {
 	 * Back to "no overrides": delete the file and every backup/evidence copy left by tests (the run directory persists between runs,
 	 * so copies from earlier runs must not be counted by later ones) and let the runtime re-read it.
 	 */
-	private static void cleanOverrides() {
+	static void cleanOverrides() {
 		try {
 			Files.deleteIfExists(overridesFile());
 			Files.deleteIfExists(tmpFile().resolve("blocker"));

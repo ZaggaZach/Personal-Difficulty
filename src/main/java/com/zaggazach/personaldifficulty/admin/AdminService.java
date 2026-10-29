@@ -308,4 +308,34 @@ public final class AdminService {
 			return failure(actor, "Could not save the availability policy, so nothing was changed: " + e.getMessage(), Outcome.REFUSED);
 		}
 	}
+
+	// ------------------------------------------------------------------ settings (admin set / unset), used by the Settings menu
+
+	/**
+	 * {@code admin set <key> <value>} for an actor: authority first, then exactly the runtime's strict set (validate, write, publish).
+	 * A change is broadcast to operators like the command; "nothing to store" goes to the actor only; a refusal changes nothing.
+	 */
+	public static AdminResult setSetting(AdminActor actor, PdRuntime rt, String key, String valueText) {
+		if (!actor.authorised()) {
+			return unauthorised(actor);
+		}
+		return report(actor, rt.setValue(key, valueText));
+	}
+
+	/** {@code admin unset <key>} for an actor. */
+	public static AdminResult unsetSetting(AdminActor actor, PdRuntime rt, String key) {
+		if (!actor.authorised()) {
+			return unauthorised(actor);
+		}
+		return report(actor, rt.unsetValue(key));
+	}
+
+	/** The same reporting as the commands' {@code report}: changes broadcast, no-ops to the sender, refusals as failures. */
+	private static AdminResult report(AdminActor actor, com.zaggazach.personaldifficulty.config.SetResult r) {
+		return switch (r.kind()) {
+			case APPLIED -> success(actor, r.message(), true, Outcome.APPLIED);
+			case UNCHANGED -> success(actor, r.message(), false, Outcome.UNCHANGED);
+			case REFUSED -> failure(actor, r.message(), Outcome.REFUSED);
+		};
+	}
 }

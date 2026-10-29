@@ -7,6 +7,10 @@ import com.zaggazach.personaldifficulty.admin.AdminActor;
 import com.zaggazach.personaldifficulty.admin.AdminResult;
 import com.zaggazach.personaldifficulty.admin.AdminService;
 import com.zaggazach.personaldifficulty.admin.PlayerDirectory;
+import com.zaggazach.personaldifficulty.config.ConfigState;
+import com.zaggazach.personaldifficulty.config.SettingDef;
+import com.zaggazach.personaldifficulty.config.SettingStep;
+import com.zaggazach.personaldifficulty.config.StrictValue;
 import com.zaggazach.personaldifficulty.logic.SelectionPolicy;
 import com.zaggazach.personaldifficulty.store.PlayerRecord;
 import java.util.ArrayList;
@@ -24,7 +28,8 @@ import net.minecraft.world.item.Items;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The administrator menu (Phase 3, layout redesigned in 1.3.1-rc.2): Players and Server Difficulties. One server-side state machine; the client sends
+ * The administrator menu (Phase 3, layout redesigned in 1.3.1-rc.2; Settings added in Phase 4): Players, Settings and Server
+ * Difficulties. One server-side state machine; the client sends
  * only a slot index and a click type, and nothing else (page, selected player, pending allow-list) is ever taken from it.
  *
  * <p>Every change goes through {@link AdminService} with this menu's {@link #actor}, so it is the same code, the same refusals, the
@@ -45,7 +50,23 @@ public final class AdminMenu extends PdAdminMenu {
 
 	// ---- hub
 	static final int HUB_PLAYERS = 20;
+	static final int HUB_SETTINGS = 22;
 	static final int HUB_DIFFICULTIES = 24;
+
+	// ---- settings section (Phase 4)
+	static final int SETTINGS_INFO = 4;
+	static final int SETTINGS_EASY = 20;
+	static final int SETTINGS_HARD = 22;
+	static final int SETTINGS_ELITE = 24;
+	static final int SETTINGS_GENERAL = 30;
+	static final int SETTINGS_ADVANCED = 32;
+	static final int PAGE_RESET = 0;
+	static final int PAGE_HEADER = 4;
+
+	/** Settings page layout: four rows of two settings, each [-][value][+][reset]; row r (1..4) left at 9r, right at 9r+5. */
+	static int settingBase(int indexOnPage) {
+		return (1 + indexOnPage / 2) * 9 + (indexOnPage % 2 == 0 ? 0 : 5);
+	}
 
 	// ---- player list
 	static final int LIST_PAGE_INFO = 47;
@@ -78,7 +99,10 @@ public final class AdminMenu extends PdAdminMenu {
 		PLAYER,
 		POLICY,
 		CONFIRM_RESTRICT,
-		CONFIRM_RESET
+		CONFIRM_RESET,
+		SETTINGS,
+		SETTINGS_PAGE,
+		CONFIRM_RESET_PAGE
 	}
 
 	private Screen screen = Screen.HUB;
@@ -88,6 +112,7 @@ public final class AdminMenu extends PdAdminMenu {
 	/** The allow-list being edited on the player page; saved only by the Save button. */
 	private final Set<PersonalDifficultyMode> pending = EnumSet.noneOf(PersonalDifficultyMode.class);
 	private String last = "";
+	private SettingsPages settingsPage = SettingsPages.EASY;
 
 	private AdminMenu(int containerId, ServerPlayer player, AdminActor actor) {
 		super(containerId, player, ROWS, actor);
@@ -133,6 +158,18 @@ public final class AdminMenu extends PdAdminMenu {
 		return last;
 	}
 
+	SettingsPages settingsPage() {
+		return settingsPage;
+	}
+
+	// ------------------------------------------------------------------ click kinds
+
+	/** Shift-click is accepted only on a settings page (where it means ten steps); everywhere else only plain presses reach the menu. */
+	@Override
+	protected boolean supports(ClickKind kind) {
+		return kind.isPlainPress() || (kind == ClickKind.SHIFT_CLICK && screen == Screen.SETTINGS_PAGE);
+	}
+
 	// ------------------------------------------------------------------ clicks
 
 	@Override
@@ -141,6 +178,9 @@ public final class AdminMenu extends PdAdminMenu {
 		if (rt == null) {
 			player.closeContainer();
 			return;
+		}
+		if (kind == ClickKind.SHIFT_CLICK && !(screen == Screen.SETTINGS_PAGE && isStepSlot(slot))) {
+			return; // a shift-click means "ten steps" on a -/+ button and nothing anywhere else
 		}
 		if (slot == NAV_CLOSE) {
 			player.closeContainer();
@@ -153,6 +193,9 @@ public final class AdminMenu extends PdAdminMenu {
 			case POLICY -> pressPolicy(slot, rt);
 			case CONFIRM_RESTRICT -> pressConfirmRestrict(slot, rt);
 			case CONFIRM_RESET -> pressConfirmReset(slot, rt);
+			case SETTINGS -> pressSettings(slot);
+			case SETTINGS_PAGE -> pressSettingsPage(slot, kind, rt);
+			case CONFIRM_RESET_PAGE -> pressConfirmResetPage(slot, rt);
 		}
 		if (stillValid(player)) {
 			render();
@@ -175,6 +218,7 @@ public final class AdminMenu extends PdAdminMenu {
 				go(Screen.PLAYERS);
 			}
 			case HUB_DIFFICULTIES -> go(Screen.POLICY);
+			case HUB_SETTINGS -> go(Screen.SETTINGS);
 			default -> {
 			}
 		}
@@ -366,6 +410,147 @@ public final class AdminMenu extends PdAdminMenu {
 		}
 	}
 
+	// ------------------------------------------------------------------ settings (Phase 4)
+
+	private void pressSettings(int slot) {
+		SettingsPages target = switch (slot) {
+			case SETTINGS_EASY -> SettingsPages.EASY;
+			case SETTINGS_HARD -> SettingsPages.HARD;
+			case SETTINGS_ELITE -> SettingsPages.ELITE;
+			case SETTINGS_GENERAL -> SettingsPages.GENERAL;
+			case SETTINGS_ADVANCED -> SettingsPages.ELITE_ADVANCED;
+			default -> null;
+		};
+		if (slot == NAV_BACK) {
+			go(Screen.HUB);
+		} else if (target != null) {
+			settingsPage = target;
+			go(Screen.SETTINGS_PAGE);
+		}
+	}
+
+	/** The setting shown at {@code slot} on the current sub-page and which of its four buttons the slot is, or null. */
+	private record SettingSlot(SettingDef def, int part) {
+		static final int MINUS = 0;
+		static final int VALUE = 1;
+		static final int PLUS = 2;
+		static final int RESET = 3;
+	}
+
+	private @Nullable SettingSlot settingAt(int slot) {
+		List<SettingDef> shown = settingsPage.settingsOn(page);
+		for (int i = 0; i < shown.size(); i++) {
+			int base = settingBase(i);
+			if (slot >= base && slot < base + 4) {
+				return new SettingSlot(shown.get(i), slot - base);
+			}
+		}
+		return null;
+	}
+
+	private boolean isStepSlot(int slot) {
+		SettingSlot s = settingAt(slot);
+		return s != null && s.def().type() != SettingDef.Type.BOOL && (s.part() == SettingSlot.MINUS || s.part() == SettingSlot.PLUS);
+	}
+
+	private void pressSettingsPage(int slot, ClickKind kind, PdRuntime rt) {
+		switch (slot) {
+			case NAV_BACK -> {
+				go(Screen.SETTINGS);
+				return;
+			}
+			case NAV_PREV -> {
+				page = Math.max(0, page - 1);
+				return;
+			}
+			case NAV_NEXT -> {
+				page = Math.min(settingsPage.pageCount() - 1, page + 1);
+				return;
+			}
+			case PAGE_RESET -> {
+				if (!overridden(rt).isEmpty()) {
+					screen = Screen.CONFIRM_RESET_PAGE; // keeps the sub-page, so Cancel returns to it
+				}
+				return;
+			}
+			default -> {
+			}
+		}
+		SettingSlot s = settingAt(slot);
+		if (s == null) {
+			return;
+		}
+		SettingDef d = s.def();
+		boolean bool = d.type() == SettingDef.Type.BOOL;
+		boolean big = kind == ClickKind.SHIFT_CLICK;
+		switch (s.part()) {
+			case SettingSlot.MINUS -> {
+				if (!bool) {
+					step(rt, d, -1, big);
+				}
+			}
+			case SettingSlot.PLUS -> {
+				if (!bool) {
+					step(rt, d, 1, big);
+				}
+			}
+			case SettingSlot.VALUE -> {
+				if (bool) {
+					step(rt, d, 1, false);
+				}
+			}
+			case SettingSlot.RESET -> {
+				if (rt.state().sourceOf(d) == ConfigState.Source.OVERRIDE) {
+					result(AdminService.unsetSetting(actor, rt, d.key()));
+				}
+			}
+			default -> {
+			}
+		}
+	}
+
+	private void step(PdRuntime rt, SettingDef d, int direction, boolean big) {
+		switch (SettingStep.step(d, rt.state().effectiveValue(d), direction, big)) {
+			case SettingStep.AtBound at -> {
+				actor.feedback().failure(at.message());
+				last = at.message();
+			}
+			case SettingStep.Next next -> result(AdminService.setSetting(actor, rt, d.key(), next.text()));
+		}
+	}
+
+	/** The settings of the whole current page group (every sub-page) that have an override. */
+	private List<SettingDef> overridden(PdRuntime rt) {
+		return settingsPage.settings().stream().filter(d -> rt.state().sourceOf(d) == ConfigState.Source.OVERRIDE).toList();
+	}
+
+	private void pressConfirmResetPage(int slot, PdRuntime rt) {
+		switch (slot) {
+			case CONFIRM_LEFT -> {
+				List<SettingDef> targets = overridden(rt);
+				int done = 0;
+				for (SettingDef d : targets) {
+					AdminResult r = AdminService.unsetSetting(actor, rt, d.key());
+					if (r.applied()) {
+						done++;
+					} else if (r.outcome() != AdminResult.Outcome.UNCHANGED) {
+						result(r); // stop at the first refusal (for example lost authority); what was already reset stays reset
+						screen = Screen.SETTINGS_PAGE;
+						return;
+					}
+				}
+				last = "Reset " + done + " setting(s) on " + settingsPage.title() + " to the properties file or default.";
+				screen = Screen.SETTINGS_PAGE;
+			}
+			case CONFIRM_RIGHT, NAV_BACK -> {
+				last = "Cancelled; nothing changed.";
+				screen = Screen.SETTINGS_PAGE;
+			}
+			default -> {
+			}
+		}
+	}
+
 	// ------------------------------------------------------------------ rendering
 
 	/** One icon per difficulty, rising in toughness from left to right in the menu. */
@@ -446,15 +631,142 @@ public final class AdminMenu extends PdAdminMenu {
 			case POLICY -> renderPolicy(rt);
 			case CONFIRM_RESTRICT -> renderConfirmRestrict(rt);
 			case CONFIRM_RESET -> renderConfirmReset(rt);
+			case SETTINGS -> renderSettings(rt);
+			case SETTINGS_PAGE -> renderSettingsPage(rt);
+			case CONFIRM_RESET_PAGE -> renderConfirmResetPage(rt);
 		}
 	}
 
 	private void renderHub() {
 		show(HUB_PLAYERS, UiItems.head(player.getUUID(), player.getGameProfile(), Text.item("Players", ChatFormatting.GREEN),
 			lore("See every player's difficulty, and set,", "lock or restrict it.")));
+		put(HUB_SETTINGS, Items.REPEATER, "Settings", ChatFormatting.AQUA, "Change damage, hunger and Elite", "settings without editing files.");
 		put(HUB_DIFFICULTIES, Items.COMPARATOR, "Server Difficulties", ChatFormatting.GOLD, "Turn difficulties on or off", "for the whole server.");
 		lastResult(4);
 		navBar(false);
+	}
+
+	private String overrideCount(PdRuntime rt, SettingsPages p) {
+		long n = p.settings().stream().filter(d -> rt.state().sourceOf(d) == ConfigState.Source.OVERRIDE).count();
+		return n == 0 ? "No overrides." : n + " changed here (override" + (n == 1 ? ")." : "s).");
+	}
+
+	private void renderSettings(PdRuntime rt) {
+		put(SETTINGS_INFO, Items.PAPER, "About settings", ChatFormatting.AQUA,
+			"Normal is vanilla and Peaceful has fixed rules,", "so they have nothing to adjust.",
+			"Changes are saved as overrides in", "config/personaldifficulty-overrides.json.", "The properties file is never edited.",
+			"Per-damage-type multipliers: use", "'/personaldifficulty admin set'.");
+		putSettingsButton(rt, SETTINGS_EASY, itemFor(PersonalDifficultyMode.EASY), SettingsPages.EASY, ChatFormatting.GREEN);
+		putSettingsButton(rt, SETTINGS_HARD, itemFor(PersonalDifficultyMode.HARD), SettingsPages.HARD, ChatFormatting.GOLD);
+		putSettingsButton(rt, SETTINGS_ELITE, itemFor(PersonalDifficultyMode.ELITE), SettingsPages.ELITE, ChatFormatting.RED);
+		putSettingsButton(rt, SETTINGS_GENERAL, Items.BOOK, SettingsPages.GENERAL, ChatFormatting.WHITE);
+		putSettingsButton(rt, SETTINGS_ADVANCED, Items.ENDER_EYE, SettingsPages.ELITE_ADVANCED, ChatFormatting.DARK_PURPLE);
+		lastResult(8);
+		navBar(true);
+	}
+
+	private void putSettingsButton(PdRuntime rt, int slot, Item icon, SettingsPages p, ChatFormatting color) {
+		String what = switch (p) {
+			case EASY, HARD -> "Damage taken and hunger.";
+			case ELITE -> "Damage, hunger, armour and healing.";
+			case GENERAL -> "PvP, self-damage, which damage counts, aim.";
+			case ELITE_ADVANCED -> "How mobs hunt Elite players; mob effects.";
+		};
+		put(slot, icon, p.title(), color, what, p.settings().size() + " setting(s). " + overrideCount(rt, p), "Click to open.");
+	}
+
+	private void renderSettingsPage(PdRuntime rt) {
+		ConfigState state = rt.state();
+		Item icon = switch (settingsPage) {
+			case EASY -> itemFor(PersonalDifficultyMode.EASY);
+			case HARD -> itemFor(PersonalDifficultyMode.HARD);
+			case ELITE -> itemFor(PersonalDifficultyMode.ELITE);
+			case GENERAL -> Items.BOOK;
+			case ELITE_ADVANCED -> Items.ENDER_EYE;
+		};
+		put(PAGE_HEADER, icon, settingsPage.title() + " settings", ChatFormatting.AQUA,
+			"Page " + (page + 1) + " of " + settingsPage.pageCount() + ".", "Click - or + to change a value;", "shift-click for ten steps.",
+			"A glowing value is an override;", "the brush next to it resets it.");
+		List<SettingDef> overrides = overridden(rt);
+		if (!overrides.isEmpty()) {
+			put(PAGE_RESET, Items.WATER_BUCKET, "Reset this page", ChatFormatting.RED, overrides.size() + " override(s) on " + settingsPage.title() + ".",
+				"Puts them back to the properties", "file or the default. Asks first.");
+		}
+		lastResult(RESULT_CARD);
+		List<SettingDef> shown = settingsPage.settingsOn(page);
+		for (int i = 0; i < shown.size(); i++) {
+			renderSetting(state, shown.get(i), settingBase(i));
+		}
+		navBar(true);
+		if (page > 0) {
+			put(NAV_PREV, Items.ARROW, "Previous page", ChatFormatting.YELLOW);
+		}
+		if (page < settingsPage.pageCount() - 1) {
+			put(NAV_NEXT, Items.ARROW, "Next page", ChatFormatting.YELLOW);
+		}
+	}
+
+	private void renderSetting(ConfigState state, SettingDef d, int base) {
+		boolean bool = d.type() == SettingDef.Type.BOOL;
+		boolean override = state.sourceOf(d) == ConfigState.Source.OVERRIDE;
+		Object value = state.effectiveValue(d);
+		String label = settingsPage.label(d);
+		List<String> lines = new ArrayList<>();
+		lines.add("Now: " + shown(d, value) + " (" + sourceText(state.sourceOf(d)) + ")");
+		lines.add("Default: " + shown(d, d.defaultValue()));
+		if (override) {
+			lines.add("Without the override: " + shown(d, state.lowerValue(d)));
+		}
+		if (!bool) {
+			lines.add("Range: " + StrictValue.format(bounded(d, d.min())) + " to " + StrictValue.format(bounded(d, d.max())));
+		}
+		lines.add(SettingsPages.timingText(d));
+		lines.add("Key: " + d.key());
+		if (bool) {
+			lines.add("Click to turn " + (Boolean.TRUE.equals(value) ? "off." : "on."));
+			boolean on = Boolean.TRUE.equals(value);
+			show(base + 1, UiItems.button(Items.LEVER, Text.item(label + ": " + (on ? "ON" : "OFF"), on ? ChatFormatting.GREEN : ChatFormatting.RED), lore(lines.toArray(String[]::new)), override));
+		} else {
+			show(base + 1, UiItems.button(Items.NAME_TAG, Text.item(label + ": " + shown(d, value), override ? ChatFormatting.AQUA : ChatFormatting.WHITE), lore(lines.toArray(String[]::new)), override));
+			String one = SettingStep.stepText(d, false);
+			String ten = SettingStep.stepText(d, true);
+			put(base, Items.REDSTONE_TORCH, "- " + one, ChatFormatting.RED, "Click: -" + one, "Shift-click: -" + ten);
+			put(base + 2, Items.TORCH, "+ " + one, ChatFormatting.GREEN, "Click: +" + one, "Shift-click: +" + ten);
+		}
+		if (override) {
+			put(base + 3, Items.BRUSH, "Reset", ChatFormatting.YELLOW, "Removes the override; back to", shown(d, state.lowerValue(d)) + " from the " + (state.properties().explicit().contains(d.key()) ? "properties file." : "default."));
+		}
+	}
+
+	private static Object bounded(SettingDef d, double bound) {
+		return d.type() == SettingDef.Type.INT ? (Object) (long) bound : (Object) bound;
+	}
+
+	private static String shown(SettingDef d, Object v) {
+		if (d.type() == SettingDef.Type.BOOL) {
+			return Boolean.TRUE.equals(v) ? "on" : "off";
+		}
+		return StrictValue.format(v);
+	}
+
+	private static String sourceText(ConfigState.Source s) {
+		return switch (s) {
+			case DEFAULT -> "default";
+			case PROPERTIES -> "properties file";
+			case OVERRIDE -> "override";
+		};
+	}
+
+	private void renderConfirmResetPage(PdRuntime rt) {
+		List<SettingDef> targets = overridden(rt);
+		StringBuilder sb = new StringBuilder("Puts these back to the properties\nfile or the default:");
+		for (SettingDef d : targets) {
+			sb.append("\n  ").append(d.key());
+		}
+		statusCard(4, "Reset " + targets.size() + " setting(s) on " + settingsPage.title() + "?", sb.toString());
+		put(CONFIRM_LEFT, Items.WATER_BUCKET, "Yes, reset", ChatFormatting.RED, "Remove " + targets.size() + " override(s) now.");
+		put(CONFIRM_RIGHT, Items.ARROW, "Cancel", ChatFormatting.YELLOW, "Change nothing.");
+		navBar(true);
 	}
 
 	private String allowedText(PlayerRecord rec) {
