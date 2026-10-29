@@ -96,47 +96,47 @@ public class EliteHuntGameTests {
 		});
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_priority_zombie(GameTestHelper h) {
 		prefersElite(h, EntityTypes.ZOMBIE, 40, false);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_priority_husk(GameTestHelper h) {
 		prefersElite(h, EntityTypes.HUSK, 41, false);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_priority_skeleton(GameTestHelper h) {
 		prefersElite(h, EntityTypes.SKELETON, 42, false);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_priority_stray(GameTestHelper h) {
 		prefersElite(h, EntityTypes.STRAY, 43, false);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_priority_creeper(GameTestHelper h) {
 		prefersElite(h, EntityTypes.CREEPER, 44, false);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_priority_spider_inTheDark(GameTestHelper h) {
 		prefersElite(h, EntityTypes.SPIDER, 45, true);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_priority_caveSpider_inTheDark(GameTestHelper h) {
 		prefersElite(h, EntityTypes.CAVE_SPIDER, 46, true);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_priority_vindicator(GameTestHelper h) {
 		prefersElite(h, EntityTypes.VINDICATOR, 47, false);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_priority_pillager(GameTestHelper h) {
 		prefersElite(h, EntityTypes.PILLAGER, 48, false);
 	}
@@ -159,7 +159,7 @@ public class EliteHuntGameTests {
 		}
 	}
 
-	@GameTest(maxTicks = 300)
+	@GameTest(environment = LEGACY_AI, maxTicks = 300)
 	public void ai_zombie_abandonsNormalAndEasyPlayersForANewElite_recoversWhenElitePeaceful_andReturnsWhenEliteAgain(GameTestHelper h) {
 		Arena a = new Arena(h, 50);
 		Lane normalLane = new Lane(a.spawn(EntityTypes.ZOMBIE, 5, 5), a.player(h, "pd_sw_n", NORMAL, 13, 5), a.player(h, "pd_sw_en", NORMAL, 19, 8));
@@ -218,7 +218,7 @@ public class EliteHuntGameTests {
 		});
 	}
 
-	@GameTest(maxTicks = 330)
+	@GameTest(environment = LEGACY_AI, maxTicks = 330)
 	public void ai_severalElitePlayers_noOscillation_andRecoveryToTheOtherElite(GameTestHelper h) {
 		Arena a = new Arena(h, 51);
 		Mob zombie = a.spawn(EntityTypes.ZOMBIE, 30, 5);
@@ -275,7 +275,7 @@ public class EliteHuntGameTests {
 		});
 	}
 
-	@GameTest(maxTicks = 260)
+	@GameTest(environment = LEGACY_AI, maxTicks = 260)
 	public void ai_hiddenEliteTarget_isKeptForItsMemory_notSwappedForAVisibleOrdinaryPlayer(GameTestHelper h) {
 		Arena a = new Arena(h, 57);
 		Mob zombie = a.spawnOnIsland(EntityTypes.ZOMBIE, 5, 5);
@@ -303,7 +303,7 @@ public class EliteHuntGameTests {
 		});
 	}
 
-	@GameTest(maxTicks = 300)
+	@GameTest(environment = LEGACY_AI, maxTicks = 300)
 	public void ai_nearestPlayerGoalCannotReplaceAHeldEliteTarget_andTheHeldTargetStillExpires(GameTestHelper h) {
 		Arena a = new Arena(h, 58);
 		Mob zombie = a.spawnOnIsland(EntityTypes.ZOMBIE, 5, 5);
@@ -339,7 +339,7 @@ public class EliteHuntGameTests {
 		});
 	}
 
-	@GameTest(maxTicks = 220)
+	@GameTest(environment = LEGACY_AI, maxTicks = 220)
 	public void ai_lineOfSightAndRangeLimitsRemain_priorityDoesNotWidenThem(GameTestHelper h) {
 		Arena a = new Arena(h, 52);
 		Mob behindWall = a.spawnOnIsland(EntityTypes.ZOMBIE, 5, 5);
@@ -388,7 +388,7 @@ public class EliteHuntGameTests {
 		}
 	}
 
-	@GameTest(maxTicks = 260)
+	@GameTest(environment = LEGACY_AI, maxTicks = 260)
 	public void ai_hiddenReacquire_followsAnObstacleCourseButNeverASealedRoom(GameTestHelper h) {
 		Arena a = new Arena(h, 53);
 		Mob viaGap = a.spawn(EntityTypes.ZOMBIE, 5, 5);
@@ -436,7 +436,7 @@ public class EliteHuntGameTests {
 
 	// ------------------------------------------------------------------ lifecycle
 
-	@GameTest(maxTicks = 320)
+	@GameTest(environment = LEGACY_AI, maxTicks = 320)
 	public void ai_deathRespawnDisconnectReconnect_eliteIsPreferredAgain(GameTestHelper h) {
 		MinecraftServer server = h.getLevel().getServer();
 		ServerLevel level = h.getLevel();
@@ -489,7 +489,7 @@ public class EliteHuntGameTests {
 
 	// ------------------------------------------------------------------ non-hostile entities are not drawn in
 
-	@GameTest(maxTicks = 220)
+	@GameTest(environment = LEGACY_AI, maxTicks = 220)
 	public void ai_passiveAndNeutralMobsAreNotTurnedIntoAttackers(GameTestHelper h) {
 		Arena a = new Arena(h, 55);
 		ServerPlayer elite = a.player(h, "pd_pn_e", ELITE, 20, 20);
@@ -555,7 +555,7 @@ public class EliteHuntGameTests {
 
 	// ------------------------------------------------------------------ performance
 
-	@GameTest(maxTicks = 700)
+	@GameTest(environment = LEGACY_AI, maxTicks = 700)
 	public void ai_performance_priorityScanCostWithManyEngagedMobs(GameTestHelper h) {
 		Arena a = new Arena(h, 56);
 		List<Mob> mobs = new ArrayList<>();

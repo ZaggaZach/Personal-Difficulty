@@ -6,6 +6,9 @@
 	"description": "In-server integration tests for Personal Difficulty (never shipped).",
 	"environment": "server",
 	"entrypoints": {
+		"main": [
+			"com.zaggazach.personaldifficulty.gametest.GameTestBootstrap"
+		],
 		"fabric-gametest": [
 			"com.zaggazach.personaldifficulty.gametest.PdGameTests",
 			"com.zaggazach.personaldifficulty.gametest.EliteGameTests",
@@ -22,7 +25,8 @@
 				"com.zaggazach.personaldifficulty.gametest.AdminTranscriptGameTests",
 				"com.zaggazach.personaldifficulty.gametest.AdminMenuGameTests",
 			"com.zaggazach.personaldifficulty.gametest.EliteAlertGameTests",
-			"com.zaggazach.personaldifficulty.gametest.PerformanceGameTests"
+			"com.zaggazach.personaldifficulty.gametest.PerformanceGameTests",
+			"com.zaggazach.personaldifficulty.gametest.EliteDefaultsGameTests"
 		]
 	},
 	"depends": {

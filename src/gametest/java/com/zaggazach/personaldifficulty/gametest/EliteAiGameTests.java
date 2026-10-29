@@ -213,44 +213,44 @@ public class EliteAiGameTests {
 		});
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_acquisition_zombie(GameTestHelper h) {
 		acquisition(h, EntityTypes.ZOMBIE, 20);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_acquisition_husk(GameTestHelper h) {
 		acquisition(h, EntityTypes.HUSK, 21);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_acquisition_skeleton(GameTestHelper h) {
 		acquisition(h, EntityTypes.SKELETON, 22);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_acquisition_stray(GameTestHelper h) {
 		acquisition(h, EntityTypes.STRAY, 23);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_acquisition_creeper(GameTestHelper h) {
 		acquisition(h, EntityTypes.CREEPER, 24);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_acquisition_vindicator(GameTestHelper h) {
 		acquisition(h, EntityTypes.VINDICATOR, 26);
 	}
 
-	@GameTest(maxTicks = 200)
+	@GameTest(environment = LEGACY_AI, maxTicks = 200)
 	public void ai_acquisition_pillager(GameTestHelper h) {
 		acquisition(h, EntityTypes.PILLAGER, 27);
 	}
 
 	// ------------------------------------------------------------------ no wallhacks, hard cap, Peaceful
 
-	@GameTest(maxTicks = 250)
+	@GameTest(environment = LEGACY_AI, maxTicks = 250)
 	public void ai_extendedAcquisition_respectsLineOfSight_andTheCap(GameTestHelper h) {
 		Arena a = new Arena(h, 2);
 		Mob behindWall = a.spawnOnIsland(EntityTypes.ZOMBIE, 5, 5);
@@ -278,7 +278,7 @@ public class EliteAiGameTests {
 		});
 	}
 
-	@GameTest(maxTicks = 320)
+	@GameTest(environment = LEGACY_AI, maxTicks = 320)
 	public void ai_peacefulStaysUntargetable_andLeavingEliteDropsTheExtendedTarget(GameTestHelper h) {
 		Arena a = new Arena(h, 3);
 		Mob m = a.spawnOnIsland(EntityTypes.ZOMBIE, 5, 5);
@@ -326,7 +326,7 @@ public class EliteAiGameTests {
 
 	// ------------------------------------------------------------------ pursuit, memory, stale state
 
-	@GameTest(maxTicks = 320)
+	@GameTest(environment = LEGACY_AI, maxTicks = 320)
 	public void ai_pursuit_eliteTargetIsHeldAndPathedBeyondVanillaFollowRange(GameTestHelper h) {
 		Arena a = new Arena(h, 4);
 		Mob mN = a.spawn(EntityTypes.ZOMBIE, 5, 5);
@@ -388,7 +388,7 @@ public class EliteAiGameTests {
 		});
 	}
 
-	@GameTest(maxTicks = 320)
+	@GameTest(environment = LEGACY_AI, maxTicks = 320)
 	public void ai_memory_eliteHuntersRememberAHiddenPlayerLonger_andOnlyWhileElite(GameTestHelper h) {
 		Arena a = new Arena(h, 5);
 		Mob mN = a.spawnOnIsland(EntityTypes.ZOMBIE, 5, 5);
@@ -438,7 +438,7 @@ public class EliteAiGameTests {
 
 	// ------------------------------------------------------------------ combat
 
-	@GameTest(maxTicks = 400)
+	@GameTest(environment = LEGACY_AI, maxTicks = 400)
 	public void ai_skeletonBowCadence_eliteShootsAtTheHardRateOnly(GameTestHelper h) {
 		Arena a = new Arena(h, 6);
 		AbstractSkeleton sN = (AbstractSkeleton) a.spawn(EntityTypes.SKELETON, 5, 5);
@@ -498,7 +498,7 @@ public class EliteAiGameTests {
 
 	// ------------------------------------------------------------------ performance
 
-	@GameTest(maxTicks = 700)
+	@GameTest(environment = LEGACY_AI, maxTicks = 700)
 	public void ai_performance_idleMobsNearAnEliteVsNormalPlayer(GameTestHelper h) {
 		Arena a = new Arena(h, 7);
 		List<Mob> mobs = new ArrayList<>();

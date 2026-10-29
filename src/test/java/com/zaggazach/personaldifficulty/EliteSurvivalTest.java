@@ -86,7 +86,7 @@ class EliteSurvivalTest {
 
 	@Test
 	void pursuitUsesTheLargerOfFollowAndAcquisitionSoANewTargetIsNeverDroppedImmediately() {
-		assertEquals(1.25, EliteSurvival.pursuitFactor(PdConfig.defaults().eliteAi()));
+		assertEquals(3.0, EliteSurvival.pursuitFactor(PdConfig.defaults().eliteAi()), "1.4.0 default: acquisition 3.0 beats follow 1.25");
 		assertEquals(1.5, EliteSurvival.pursuitFactor(new PdConfig.EliteAi(1.5, 1.25, true, 2.0, true)));
 		assertEquals(1.5, EliteSurvival.pursuitFactor(new PdConfig.EliteAi(1.0, 1.5, true, 2.0, true)));
 		assertEquals(1.0, EliteSurvival.pursuitFactor(new PdConfig.EliteAi(1.0, 1.0, true, 2.0, true)));
@@ -124,11 +124,16 @@ class EliteSurvivalTest {
 	void defaultsMatchTheDocumentedValues() {
 		PdConfig c = PdConfig.defaults();
 		assertEquals(0.5, c.eliteRegenMultiplier());
-		assertEquals(1.25, c.eliteAi().acquisitionRangeMultiplier());
+		assertEquals(3.0, c.eliteAi().acquisitionRangeMultiplier(), "1.4.0 (plan C2); 1.3.0 used 1.25");
 		assertEquals(1.25, c.eliteAi().followRangeMultiplier());
 		assertTrue(c.eliteAi().improvedPursuit());
-		assertEquals(2.0, c.eliteAi().targetMemoryMultiplier());
+		assertEquals(5.0, c.eliteAi().targetMemoryMultiplier(), "1.4.0 (plan C2); 1.3.0 used 2.0");
 		assertTrue(c.eliteAi().advancedCombat());
+		assertEquals(128, c.eliteAi().absoluteRangeCap());
+		assertTrue(c.eliteAlert().enabled(), "1.4.0: the alert network is on by default");
+		assertEquals(64, c.eliteAlert().radius());
+		assertEquals(2, c.eliteAlert().hops());
+		assertEquals(60, c.eliteAlert().memorySeconds());
 		// 1.1.0 defaults are untouched
 		assertEquals(2.0, c.elite().damageMultiplier());
 		assertEquals(0.60, c.eliteArmorEffectiveness());
@@ -155,7 +160,7 @@ class EliteSurvivalTest {
 			"elite.ai.advanced-combat=1"));
 		PdConfig b = bad.config();
 		assertEquals(PdConfig.MIN_REGEN_MULTIPLIER, b.eliteRegenMultiplier(), "0 would freeze regeneration: clamped to the minimum");
-		assertEquals(1.25, b.eliteAi().acquisitionRangeMultiplier(), "NaN -> default");
+		assertEquals(3.0, b.eliteAi().acquisitionRangeMultiplier(), "NaN -> default");
 		assertEquals(1.25, b.eliteAi().followRangeMultiplier(), "Infinity -> default");
 		assertEquals(1.0, b.eliteAi().targetMemoryMultiplier(), "negative clamped to 1.0 (no effect)");
 		assertTrue(b.eliteAi().improvedPursuit(), "bad boolean -> default");

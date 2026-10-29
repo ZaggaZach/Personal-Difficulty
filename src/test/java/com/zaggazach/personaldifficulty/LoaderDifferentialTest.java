@@ -32,6 +32,10 @@ import org.junit.jupiter.api.io.TempDir;
  * difference is the range named in the warning ("outside [1.0, 2.0]" becomes "outside [1.0, 3.0]"); exactly that text is
  * translated in the 1.3.0 warnings before comparing. The new key {@code elite.ai.absolute-range-cap} is unknown to the 1.3.0
  * loader and is never part of the generated inputs.
+ *
+ * <p><b>Approved default changes (plan C2):</b> the acquisition and memory defaults are 3.0 and 5.0 (were 1.25 and 2.0). Every 1.3.0
+ * result is passed through {@link ApprovedDefaults}, which changes exactly the values (and "using default" warning texts) where the
+ * 1.3.0 loader fell back to its default for one of those two keys, and nothing else.
  */
 class LoaderDifferentialTest {
 	/** Every scalar key, written out by hand (NOT taken from the registry, so the test is independent of it). */
@@ -115,7 +119,7 @@ class LoaderDifferentialTest {
 
 	private static void compare(Properties original, String label) {
 		Properties p = withoutApprovedChanges(original);
-		LegacyConfigLoader.Result legacy = LegacyConfigLoader.fromProperties(p);
+		LegacyConfigLoader.Result legacy = ApprovedDefaults.fromProperties(p);
 		LegacyConfigLoader.Result expected = new LegacyConfigLoader.Result(legacy.config(),
 			legacy.warnings().stream().map(LoaderDifferentialTest::withRaisedRangeText).toList(), legacy.readFailed());
 		PdConfigLoader.Result actual = PdConfigLoader.fromProperties(p);
@@ -256,7 +260,7 @@ class LoaderDifferentialTest {
 			"easy.damage-multiplier=0.5\r\nhard.damage-multiplier=1.5\r\n", "\ufeffeasy.damage-multiplier=0.5\n", "easy.damage-multiplier=0.5\u0000\n", "k=v\nunknown.key=1\n"
 		);
 		for (String text : texts) {
-			LegacyConfigLoader.Result e = LegacyConfigLoader.parse(text);
+			LegacyConfigLoader.Result e = ApprovedDefaults.parse(text);
 			PdConfigLoader.Result a = PdConfigLoader.parse(text);
 			assertEquals(e.config(), a.config(), "config for text: " + text);
 			assertEquals(e.readFailed(), a.readFailed(), "readFailed for text: " + text);
@@ -268,32 +272,32 @@ class LoaderDifferentialTest {
 	void loadAndLoadOrCreateOnRealFilesAndFailures(@TempDir Path dir) throws IOException {
 		Path good = dir.resolve("good.properties");
 		Files.writeString(good, "easy.damage-multiplier=0.5\nelite.priority.scan-interval-ticks=7.5\nhard.hunger-multiplier=99\nelite.effects.enabled=maybe\n");
-		assertSameResult(LegacyConfigLoader.load(good), PdConfigLoader.load(good), "good file");
+		assertSameResult(ApprovedDefaults.load(good), PdConfigLoader.load(good), "good file");
 
 		Path missing = dir.resolve("missing.properties");
-		assertSameResult(LegacyConfigLoader.load(missing), PdConfigLoader.load(missing), "missing file");
+		assertSameResult(ApprovedDefaults.load(missing), PdConfigLoader.load(missing), "missing file");
 
 		Path directory = Files.createDirectory(dir.resolve("a-directory"));
-		assertSameResult(LegacyConfigLoader.load(directory), PdConfigLoader.load(directory), "directory at the path");
+		assertSameResult(ApprovedDefaults.load(directory), PdConfigLoader.load(directory), "directory at the path");
 
 		Path badEscape = dir.resolve("bad.properties");
 		Files.writeString(badEscape, "easy.damage-multiplier=\\u12\n");
-		assertSameResult(LegacyConfigLoader.load(badEscape), PdConfigLoader.load(badEscape), "malformed escape");
+		assertSameResult(ApprovedDefaults.load(badEscape), PdConfigLoader.load(badEscape), "malformed escape");
 
 		Path invalidUtf8 = dir.resolve("utf8.properties");
 		Files.write(invalidUtf8, new byte[] {'e', 'a', 's', 'y', '.', 'd', 'a', 'm', 'a', 'g', 'e', '-', 'm', 'u', 'l', 't', 'i', 'p', 'l', 'i', 'e', 'r', '=', (byte) 0xff, (byte) 0xfe, '\n'});
-		assertSameResult(LegacyConfigLoader.load(invalidUtf8), PdConfigLoader.load(invalidUtf8), "invalid utf-8");
+		assertSameResult(ApprovedDefaults.load(invalidUtf8), PdConfigLoader.load(invalidUtf8), "invalid utf-8");
 
 		Path createdByLegacy = dir.resolve("legacy").resolve("c.properties");
 		Path createdByNew = dir.resolve("new").resolve("c.properties");
-		LegacyConfigLoader.Result e = LegacyConfigLoader.loadOrCreate(createdByLegacy);
+		LegacyConfigLoader.Result e = ApprovedDefaults.loadOrCreate(createdByLegacy);
 		PdConfigLoader.Result a = PdConfigLoader.loadOrCreate(createdByNew);
 		assertSameResult(e, a, "loadOrCreate on a fresh path");
 		assertEquals(Files.readString(createdByLegacy), Files.readString(createdByNew), "the created default file is identical");
 
 		Path blocker = dir.resolve("blocker");
 		Files.writeString(blocker, "i am a file");
-		assertSameResult(LegacyConfigLoader.loadOrCreate(blocker.resolve("x.properties")), PdConfigLoader.loadOrCreate(blocker.resolve("x.properties")), "unwritable location");
+		assertSameResult(ApprovedDefaults.loadOrCreate(blocker.resolve("x.properties")), PdConfigLoader.loadOrCreate(blocker.resolve("x.properties")), "unwritable location");
 	}
 
 	private static void assertSameResult(LegacyConfigLoader.Result e, PdConfigLoader.Result a, String label) {

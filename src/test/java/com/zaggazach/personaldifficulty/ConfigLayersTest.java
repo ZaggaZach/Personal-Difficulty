@@ -39,7 +39,7 @@ class ConfigLayersTest {
 		);
 		for (String text : texts) {
 			ConfigState state = ConfigState.compose(layer(text), OverridesLayer.EMPTY);
-			assertEquals(LegacyConfigLoader.parse(text).config(), state.effective(), "text: " + text);
+			assertEquals(ApprovedDefaults.parse(text).config(), state.effective(), "text: " + text);
 			assertEquals(PdConfigLoader.parse(text).config(), state.effective());
 		}
 	}

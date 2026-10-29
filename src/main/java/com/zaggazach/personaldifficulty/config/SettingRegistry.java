@@ -100,10 +100,10 @@ public final class SettingRegistry {
 		e.add(flag(o += 10, "void.apply-profile", false, "Profile applies to void damage", live, "voidApplyProfile", PdConfig::voidApplyProfile));
 		e.add(flag(o += 10, "admin.apply-profile", false, "Profile applies to administrative damage", live, "adminApplyProfile", PdConfig::adminApplyProfile));
 		// Elite AI
-		e.add(num(o += 10, "elite.ai.acquisition-range-multiplier", 1, PdConfig.MAX_AI_RANGE_MULTIPLIER, 1.25, 0.05, "Elite AI: target acquisition range multiplier", live, "eliteAi.acquisitionRangeMultiplier", c -> c.eliteAi().acquisitionRangeMultiplier()));
+		e.add(num(o += 10, "elite.ai.acquisition-range-multiplier", 1, PdConfig.MAX_AI_RANGE_MULTIPLIER, 3.0, 0.05, "Elite AI: target acquisition range multiplier", live, "eliteAi.acquisitionRangeMultiplier", c -> c.eliteAi().acquisitionRangeMultiplier()));
 		e.add(num(o += 10, "elite.ai.follow-range-multiplier", 1, PdConfig.MAX_AI_RANGE_MULTIPLIER, 1.25, 0.05, "Elite AI: pursuit range multiplier", live, "eliteAi.followRangeMultiplier", c -> c.eliteAi().followRangeMultiplier()));
 		e.add(flag(o += 10, "elite.ai.improved-pursuit", true, "Elite AI: improved pursuit", live, "eliteAi.improvedPursuit", c -> c.eliteAi().improvedPursuit()));
-		e.add(num(o += 10, "elite.ai.target-memory-multiplier", 1, PdConfig.MAX_MEMORY_MULTIPLIER, 2.0, 0.1, "Elite AI: target memory multiplier", live, "eliteAi.targetMemoryMultiplier", c -> c.eliteAi().targetMemoryMultiplier()));
+		e.add(num(o += 10, "elite.ai.target-memory-multiplier", 1, PdConfig.MAX_MEMORY_MULTIPLIER, 5.0, 0.1, "Elite AI: target memory multiplier", live, "eliteAi.targetMemoryMultiplier", c -> c.eliteAi().targetMemoryMultiplier()));
 		e.add(flag(o += 10, "elite.ai.advanced-combat", true, "Elite AI: advanced combat", live, "eliteAi.advancedCombat", c -> c.eliteAi().advancedCombat()));
 		e.add(new SettingDef("elite.ai.absolute-range-cap", Type.INT, PdConfig.MIN_RANGE_CAP, PdConfig.MAX_RANGE_CAP, PdConfig.DEFAULT_RANGE_CAP, 8,
 			"Elite AI: absolute range cap (blocks)", live, o += 10, "eliteAi.absoluteRangeCap", c -> c.eliteAi().absoluteRangeCap()));

@@ -21,9 +21,10 @@ import net.minecraft.world.phys.Vec3;
 /**
  * Phase 5: the alert network and last-known-position search, on live vanilla AI.
  *
- * <p>The feature is off by default, so the {@code ai_alert_*} tests run in their own test environment
- * ({@code personaldifficulty-gametest:elite_alerts}), whose setup and teardown functions switch it on and off around that batch;
- * no other test runs while it is on. {@code ai_alertOff_*} runs in the default environment and proves nothing happens while it is off.
+ * <p>The feature is on by default since the Phase 5 performance gate passed. The {@code ai_alert_*} tests still run in their own
+ * test environment ({@code personaldifficulty-gametest:elite_alerts}), which switches it on explicitly (whatever the server's
+ * settings say) and keeps other arenas' mobs out of the batch. {@code ai_alertOff_*} runs in {@link PdTestSupport#LEGACY_AI},
+ * where it is off, and proves nothing is passed on then.
  *
  * <p>The scenario: a "sentry" zombie that cannot move (slowness) sees an Elite player; a "listener" zombie 50 blocks away is cut off
  * from the player by a wall. After the sentry has seen the player, the player is moved behind a second wall where nobody can see
@@ -118,9 +119,9 @@ public class EliteAlertGameTests {
 		});
 	}
 
-	@GameTest(maxTicks = 500)
+	@GameTest(environment = LEGACY_AI, maxTicks = 500)
 	public void ai_alertOff_nothingIsPassedOnWhileTheSettingIsOff(GameTestHelper h) {
-		check(!rt().config().eliteAlert().enabled(), "off by default");
+		check(!rt().config().eliteAlert().enabled(), "the test environment switched the alert network off");
 		Scene s = scene(h, 92, "pd_al_off", PersonalDifficultyMode.ELITE);
 		double[] minToSeen = {Double.MAX_VALUE};
 		long[] sawAt = {-1};

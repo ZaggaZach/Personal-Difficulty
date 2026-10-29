@@ -128,7 +128,7 @@ public record PdConfig(
 	 * @param memorySeconds how long a sighting is kept
 	 */
 	public record EliteAlert(boolean enabled, int radius, int hops, int memorySeconds) {
-		public static final EliteAlert DEFAULTS = new EliteAlert(false, 64, 2, 60);
+		public static final EliteAlert DEFAULTS = new EliteAlert(true, 64, 2, 60);
 	}
 
 	/** One attacker family's effect: probability per successful hit and base duration. */
@@ -170,7 +170,7 @@ public record PdConfig(
 			false,
 			false,
 			new RangedMobs(true, true, true, true, true, true),
-			new EliteAi(1.25, 1.25, true, 2.0, true, DEFAULT_RANGE_CAP),
+			new EliteAi(3.0, 1.25, true, 5.0, true, DEFAULT_RANGE_CAP),
 			new EliteHunt(true, 10, 8),
 			new EliteEffects(true, 30, new MobEffectSetting(0.35, 8), new MobEffectSetting(0.35, 5), new MobEffectSetting(0.50, 6),
 				new MobEffectSetting(0.25, 4), new MobEffectSetting(0.30, 3)),

@@ -125,10 +125,10 @@ for Peaceful) or the mob dies. Nothing sees through walls and nothing is given e
 
 | Setting | Default | Effect | Verified by a live-AI test? |
 |---|---|---|---|
-| `elite.ai.acquisition-range-multiplier` | **1.25** | An idle mob may notice an Elite player out to this multiple of its own follow range (1.0 = off, max 3.0). Line of sight, sneaking/head-gear/invisibility rules, selectors and `canAttack` still apply; Peaceful players are never candidates. | yes: zombie, husk, skeleton, stray, creeper, vindicator, pillager |
+| `elite.ai.acquisition-range-multiplier` | **3.0** (1.3.0: 1.25) | An idle mob may notice an Elite player out to this multiple of its own follow range (1.0 = off, max 3.0): a zombie up to 105 blocks, a skeleton up to 48, never beyond the cap. Line of sight, sneaking/head-gear/invisibility rules, selectors and `canAttack` still apply; Peaceful players are never candidates. | yes: zombie, husk, skeleton, stray, creeper, vindicator, pillager |
 | `elite.ai.follow-range-multiplier` | **1.25** | A mob keeps hunting an Elite player, and its pathfinder searches for a route, out to this multiple (1.0 = off, max 3.0; the larger of this and the acquisition multiplier is used so that a target is never acquired and dropped on the next tick). | yes: zombie (target held, complete route found, closes in) |
 | `elite.ai.improved-pursuit` | **true** | Master switch for the next setting and for a shorter melee "start chasing" re-check (5 instead of 20 ticks). | memory: yes (zombie); re-check: **hook-level only** |
-| `elite.ai.target-memory-multiplier` | **2.0** | A mob forgets an Elite target it cannot see after 2x as long (vanilla 60 ticks; max 5.0, never above 400 ticks). | yes: zombie, 61 vs 122 ticks |
+| `elite.ai.target-memory-multiplier` | **5.0** (1.3.0: 2.0) | A mob forgets an Elite target it cannot see after 5x as long: 15 s instead of vanilla's 3 s (max 5.0, never above 400 ticks). | yes: zombie, 61 vs 122 ticks at 2.0 |
 | `elite.ai.advanced-combat` | **true** | Skeleton-family bow cadence against Elite players is the vanilla *Hard* cadence (20 ticks between shots instead of 40) even in an Easy/Normal world. | yes: skeleton, 6 vs 9 arrows in 350 ticks |
 | `elite.ai.absolute-range-cap` | **128** | No Elite range adjustment reaches beyond this many blocks (16 .. 256; 1.3.0 used a fixed 64). The server's simulation distance is a further real limit. | unit-tested |
 
@@ -139,8 +139,7 @@ shrunk. If the world is already on Hard, the bow setting changes nothing (the ca
 Which mobs are covered: the acquisition, pursuit and memory hooks sit in the vanilla goals every "nearest player"
 hostile uses (`NearestAttackableTargetGoal`, `TargetGoal`, `PathNavigation`), so any mob built on them is covered by
 construction, but only the mobs in the table were actually run through the live AI and **only those are claimed**. Not
-claimed (not tested, or known not to apply): spiders and cave spiders (their own night-only goal), witches (a live test
-found no extended acquisition - not supported), endermen (provoked by gaze), phantoms, drowned, guardians, piglin-family
+claimed (not tested, or known not to apply): spiders and cave spiders (their own night-only goal), endermen (provoked by gaze), phantoms, drowned, guardians, piglin-family
 and hoglins, the Warden, the Ender Dragon, blazes, ghasts, breezes, the Wither, illagers other than the vindicator and
 pillager, zombified piglins, and all modded mobs.
 
@@ -157,7 +156,7 @@ Hostile mobs now prefer an eligible Elite player over any other player - **inclu
 * **Stable.** A mob that already hunts a valid Elite player keeps that target; it never swaps between Elite players, so groups
   of Elite players cannot make it flip-flop. It switches only when its Elite target is gone (dead, Peaceful, out of range,
   forgotten, disconnected) and then takes the nearest remaining candidate.
-* **Hidden targets.** A mob that lost sight of an Elite player keeps hunting (memory x2, see 1.2.0) and, for
+* **Hidden targets.** A mob that lost sight of an Elite player keeps hunting (memory x5 by default, see above) and, for
   `elite.priority.reacquire-hidden-seconds` (default 8 s) after it last SAW them, may re-acquire that same player without line of
   sight - but only if its pathfinder finds a **complete route** to them within range (around obstacles, never through them; a
   sealed room is never entered).
@@ -171,7 +170,21 @@ Hostile mobs now prefer an eligible Elite player over any other player - **inclu
 * `elite.priority.enabled=false` restores the 1.2.0 behaviour (wider range only when vanilla found nobody).
 
 Verified with live AI for: zombie, husk, skeleton, stray, creeper, spider and cave spider (in the dark), vindicator and
-pillager. **Not verified, so not claimed:** every other mob (see `docs/VERIFICATION.md`).
+pillager, and (1.4.0) the witch: a live test shows it acquires an Elite player beyond its vanilla range and never a Normal
+one (1.2.0 had found none; the cause was its targeting goal's raid-healing flag, explained in the changelog). **Not verified,
+so not claimed:** every other mob (see `docs/VERIFICATION.md`).
+
+#### Alert network and last-known-position search (1.4.0)
+A mob that **sees** an Elite player records where and when. Hostile mobs near it (`elite.alert.radius`, default 64 blocks) learn
+of that sighting, and may pass it on (`elite.alert.hops`, default 2). A mob with no target then walks to the **remembered point**
+with its ordinary pathfinder - around obstacles, never through them - and gives up after 30 seconds. Nobody is ever told where
+the player is *now*: once the player moves, the point is stale. Each mob searches a sighting once; sightings are kept for
+`elite.alert.memory-seconds` (default 60). Only Elite sightings are passed on. `elite.alert.enabled=false` switches it off.
+
+Performance (200 hostile mobs, 5 Elite players, 16-thread desktop): 3x detection, 5x memory and the alert network together
+measured within the plan's 1 ms-per-tick budget over the no-Elite baseline in three runs (+0.24, -0.05, -0.05 ms; run-to-run
+noise is about 0.3 ms). Detection range is the costliest part (+0.3 to +0.9 ms); lower the multiplier or the cap if a server
+is short of tick time.
 
 #### Elite combat effects (1.3.0)
 When one of these mobs **genuinely damages** an Elite player it may inflict a temporary effect. "Genuinely" means: the hit
@@ -320,15 +333,19 @@ ranged.crossbow-mobs=true           # pillagers
 ranged.piglins=true
 ranged.witches=true
 elite.natural-regeneration-multiplier=0.50   # 0.1 .. 1.0, fraction of vanilla natural healing speed
-elite.ai.acquisition-range-multiplier=1.25   # 1.0 .. 3.0
+elite.ai.acquisition-range-multiplier=3.0    # 1.0 .. 3.0
 elite.ai.follow-range-multiplier=1.25        # 1.0 .. 3.0
 elite.ai.improved-pursuit=true
-elite.ai.target-memory-multiplier=2.0        # 1.0 .. 5.0
+elite.ai.target-memory-multiplier=5.0        # 1.0 .. 5.0
 elite.ai.advanced-combat=true
 elite.ai.absolute-range-cap=128              # 16 .. 256 blocks
 elite.priority.enabled=true                   # hostile mobs prefer Elite players
 elite.priority.scan-interval-ticks=10         # 5 .. 40
 elite.priority.reacquire-hidden-seconds=8     # 0 .. 30, 0 = off
+elite.alert.enabled=true                      # mobs pass on where they saw an Elite player
+elite.alert.radius=64                         # 8 .. 128 blocks
+elite.alert.hops=2                            # 0 .. 4
+elite.alert.memory-seconds=60                 # 5 .. 300
 elite.effects.enabled=true
 elite.effects.max-duration-seconds=30         # 1 .. 60
 elite.effects.zombie-infection-chance=0.35    # per damaging hit, 0 .. 1

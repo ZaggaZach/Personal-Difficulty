@@ -43,6 +43,14 @@ import net.minecraft.world.phys.Vec3;
 public final class PdTestSupport {
 	public static final float EPS = 1e-4F;
 
+	/**
+	 * Test environment for the live-AI tests written against the 1.3.0 Elite hunting numbers (1.25x detection, 2x memory, no alert
+	 * network). Since 1.4.0 the defaults are 3x, 5x and alerts on; those tests keep checking the exact 1.3.0 behaviour (still
+	 * reachable through the settings) by running in this environment, whose setup pins the three values as overrides and whose
+	 * teardown removes them. The new defaults are tested live in the default environment ({@code EliteDefaultsGameTests}).
+	 */
+	public static final String LEGACY_AI = "personaldifficulty-gametest:elite_13_ai";
+
 	private PdTestSupport() {
 	}
 

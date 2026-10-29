@@ -96,9 +96,9 @@ class ConfigRuntimeTest {
 	void noOverridesFileMeansIdenticalBehaviourToTheLegacyLoader_andNoFileIsCreated(@TempDir Path dir) throws Exception {
 		String text = "easy.damage-multiplier=0.5\nhard.hunger-multiplier=99\nelite.effects.enabled=maybe\neasy.damage-type.minecraft.fall=0.3\n";
 		Fixture f = fixture(dir, text);
-		assertEquals(LegacyConfigLoader.parse(text).config(), f.rt().config());
+		assertEquals(ApprovedDefaults.parse(text).config(), f.rt().config());
 		f.rt().reload();
-		assertEquals(LegacyConfigLoader.parse(text).config(), f.rt().config());
+		assertEquals(ApprovedDefaults.parse(text).config(), f.rt().config());
 		assertFalse(Files.exists(f.overrides()), "reading creates no overrides file");
 		assertTrue(withInfix(dir, ".backup-").isEmpty() && withInfix(dir, ".evidence-").isEmpty());
 	}

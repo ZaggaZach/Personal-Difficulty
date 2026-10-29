@@ -4,10 +4,13 @@
 
 ### Added so far
 * `elite.ai.absolute-range-cap` (default **128** blocks, 16 .. 256) replaces the fixed 64-block cap of 1.3.0.
-* The Elite range multipliers may now go up to **3.0** (were 2.0) and the memory multiplier up to **5.0** (was 4.0). The
-  defaults are unchanged for now (1.25 and 2.0); they move to 3.0 and 5.0 at the end of Phase 5, after the performance
-  measurement.
-* **Alert network and last-known-position search** (`elite.alert.enabled`, OFF by default for now; `elite.alert.radius` 64,
+* The Elite range multipliers may now go up to **3.0** (were 2.0) and the memory multiplier up to **5.0** (was 4.0).
+* **Changed defaults** (plan C2, after the performance gate passed): `elite.ai.acquisition-range-multiplier` **3.0** (was 1.25),
+  `elite.ai.target-memory-multiplier` **5.0** (was 2.0), `elite.alert.enabled` **true** (was false). A zombie now notices an Elite
+  player up to 105 blocks away and remembers one it cannot see for 15 s. An existing `personaldifficulty.properties` that
+  states the old values keeps them (the mod never edits that file); delete those lines, or use the settings page, to get the new
+  defaults.
+* **Alert network and last-known-position search** (`elite.alert.enabled`, on by default; `elite.alert.radius` 64,
   `elite.alert.hops` 2, `elite.alert.memory-seconds` 60): a mob that SEES an Elite player records where and when; hostile mobs
   near it learn of that sighting (passed on at most `hops` times) and, if they have no target, walk to that remembered point with
   ordinary pathfinding, re-planning from the end of a partial route for up to 30 seconds. Nobody is told where the player is
@@ -24,6 +27,17 @@
   and outside a raid it is on all the time (it is off only during the witch's raider-healing cooldown). The 1.2.0 finding no
   longer reproduces: since 1.3.0 the Elite hunting scan sets the target directly, and a live GameTest shows a witch acquiring an
   Elite player beyond its vanilla range (238 of 240 ticks in the first run) and never a Normal player at that distance.
+* **Performance gate: PASSED.** 150 zombies, 50 skeletons and 5 players (16-thread desktop, Java 25), server tick time with
+  nobody on Elite against all five on Elite with every new feature: +0.24, -0.05 and -0.05 ms over three runs (target: at most
+  +1.00 ms). Run-to-run noise is about 0.3 ms; the detection range is the costliest part (+0.28 to +0.90 ms on its own). In the
+  final run the crowd was refilled at every window start (123 of the deaths were arrows: skeletons hitting zombies). Opt-in:
+  `./gradlew runGameTest -PpdPerf=true`.
+* The live-AI tests written against the 1.3.0 numbers keep testing them exactly, in a test environment
+  (`personaldifficulty-gametest:elite_13_ai`) that pins 1.25x, 2x and alerts off; a new test checks the new defaults live (a
+  zombie notices an Elite player at 2.5x its vanilla range, never a Normal one). Every GameTest run now starts from the shipped
+  defaults (the run directory's properties file is rewritten from the template and leftover overrides removed).
+* The differential loader tests translate exactly the approved changes (raised maximums, two new defaults) in the frozen
+  1.3.0 loader's results, and compare everything else unchanged.
 * The unit tests also run outside Gradle in the development environment now, so most mistakes are caught before a build.
 
 ## 1.3.1-rc.3: UNPUBLISHED development checkpoint (Phase 4 of the 1.4.0 line: Settings in the admin menu)

@@ -1,0 +1,5 @@
+{
+	"type": "minecraft:function",
+	"setup": "personaldifficulty-gametest:legacy_ai_on",
+	"teardown": "personaldifficulty-gametest:legacy_ai_off"
+}
