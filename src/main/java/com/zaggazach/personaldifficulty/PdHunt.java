@@ -4,6 +4,7 @@ import com.zaggazach.personaldifficulty.config.PdConfig;
 import com.zaggazach.personaldifficulty.logic.AlertBoard;
 import com.zaggazach.personaldifficulty.logic.EliteSurvival;
 import com.zaggazach.personaldifficulty.logic.HuntingMob;
+import com.zaggazach.personaldifficulty.logic.PursuitStall;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -14,6 +15,7 @@ import com.zaggazach.personaldifficulty.mixin.PathNavigationAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -144,10 +146,15 @@ public final class PdHunt {
 			if (mob.getSensing().hasLineOfSight(hunted)) {
 				saw(rt, level, mob, memory, hunted);
 			}
+			watchStall(mob, memory, hunted, level.getGameTime());
 			return; // stable: never swap one Elite target for another
 		}
 		// A daytime spider is neutral; forcing a target on it would make it drop the target again every few ticks.
 		if (mob instanceof Spider && mob.getLightLevelDependentMagicValue() >= 0.5F) {
+			return;
+		}
+		elites = withoutGivenUp(mob, elites, level.getGameTime());
+		if (elites.isEmpty()) {
 			return;
 		}
 		double range = EliteSurvival.cappedRange(mob.getAttributeValue(Attributes.FOLLOW_RANGE), rt.config().eliteAi().acquisitionRangeMultiplier(), rt.config().eliteAi());
@@ -159,7 +166,63 @@ public final class PdHunt {
 			mob.setTarget(best);
 			memory.personaldifficulty$setOwnedTarget(best.getUUID());
 			memory.personaldifficulty$setUnseenTicks(0);
+			memory.personaldifficulty$setStall(0, 0);
 		}
+	}
+
+	// ------------------------------------------------------------------ giving up on an unreachable Elite player (PursuitStall)
+
+	/**
+	 * Called on the mob's scan tick while it hunts an Elite player. After {@link PursuitStall#GIVE_UP_TICKS} of partial routes
+	 * without progress it gives up the Elite extensions for that player for {@link PursuitStall#RETRY_TICKS}; if the player is
+	 * beyond its vanilla follow range it also lets go of them (inside that range it keeps hunting as a vanilla mob would).
+	 */
+	private static void watchStall(Mob mob, HuntingMob memory, ServerPlayer hunted, long now) {
+		if (gaveUpOn(mob, hunted)) {
+			return;
+		}
+		Path path = mob.getNavigation().getPath();
+		boolean partial = path != null && !path.canReach();
+		PursuitStall.State s = PursuitStall.next(new PursuitStall.State(memory.personaldifficulty$stallSince(), memory.personaldifficulty$stallBest()),
+			partial, mob.distanceTo(hunted), now);
+		if (!PursuitStall.givesUp(s, now)) {
+			memory.personaldifficulty$setStall(s.since(), s.best());
+			return;
+		}
+		memory.personaldifficulty$setStall(0, 0);
+		memory.personaldifficulty$giveUp(hunted.getUUID(), now + PursuitStall.RETRY_TICKS);
+		double follow = mob.getAttributeValue(Attributes.FOLLOW_RANGE);
+		if (mob.distanceToSqr(hunted) > follow * follow) {
+			mob.setTarget(null);
+			memory.personaldifficulty$setOwnedTarget(null);
+			mob.getNavigation().stop();
+		}
+	}
+
+	/** True while this mob has given up the Elite extensions for {@code target} (see {@link PursuitStall}). */
+	public static boolean gaveUpOn(Mob mob, @Nullable Entity target) {
+		if (!(target instanceof ServerPlayer)) {
+			return false;
+		}
+		HuntingMob memory = (HuntingMob) mob;
+		UUID id = memory.personaldifficulty$gaveUpOn();
+		return id != null && id.equals(target.getUUID()) && PursuitStall.stillGivenUp(memory.personaldifficulty$gaveUpUntil(), mob.level().getGameTime());
+	}
+
+	/** {@code elites} without the player this mob has currently given up on (the same list if there is none). */
+	static List<ServerPlayer> withoutGivenUp(Mob mob, List<ServerPlayer> elites, long now) {
+		HuntingMob memory = (HuntingMob) mob;
+		UUID id = memory.personaldifficulty$gaveUpOn();
+		if (id == null || !PursuitStall.stillGivenUp(memory.personaldifficulty$gaveUpUntil(), now)) {
+			return elites;
+		}
+		List<ServerPlayer> out = new java.util.ArrayList<>(elites.size());
+		for (ServerPlayer p : elites) {
+			if (!p.getUUID().equals(id)) {
+				out.add(p);
+			}
+		}
+		return out;
 	}
 
 	/** The mob has line of sight to an Elite player right now: remember it, and (alert network on) record the sighting. */
@@ -197,7 +260,7 @@ public final class PdHunt {
 			return null;
 		}
 		Set<UUID> eligible = new HashSet<>();
-		for (ServerPlayer p : elites) {
+		for (ServerPlayer p : withoutGivenUp(mob, elites, level.getGameTime())) {
 			eligible.add(p.getUUID());
 		}
 		HuntingMob memory = (HuntingMob) mob;
@@ -238,7 +301,7 @@ public final class PdHunt {
 		if (!target.isAlive() || target.isRemoved()) {
 			return false;
 		}
-		boolean elite = isLiveEliteTarget(rt, target);
+		boolean elite = isLiveEliteTarget(rt, target) && !gaveUpOn(mob, target);
 		if (mob.getSensing().hasLineOfSight(target)) {
 			memory.personaldifficulty$setUnseenTicks(0);
 			if (elite) {
@@ -323,6 +386,10 @@ public final class PdHunt {
 			return found;
 		}
 		List<ServerPlayer> elites = elites(level, rt);
+		if (elites.isEmpty()) {
+			return found;
+		}
+		elites = withoutGivenUp(mob, elites, level.getGameTime());
 		if (elites.isEmpty()) {
 			return found;
 		}

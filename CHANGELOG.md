@@ -39,6 +39,13 @@
   chasm result unchanged, and at 9x 30 zombies hunting an Elite player on an unreachable pillar cost +7.73 ms per tick (p95
   25 ms; new opt-in measurement `perf_unreachablePlayer_30HuntersThatCanNeverReachThem`). The plan's waypoint hops would
   end at the same edge, so they were not built.
+* **Giving up on an unreachable Elite player** (new). Measured worst case: 30 zombies hunting an Elite player they could never
+  reach (on top of a pillar) cost about +1.0 to +1.5 ms per tick, because every route search fails and is repeated. Now an Elite
+  hunter whose routes keep failing without getting a block closer for 5 seconds gives up the Elite extensions for that player
+  for 30 seconds: beyond its vanilla range it lets go of them; inside it, it keeps hunting exactly as a vanilla mob would. A
+  complete route or real progress resets the watch; a reachable player is never given up. Pillaring up therefore still works
+  as a defence against mobs that have to come from far away. Unit-tested (`PursuitStallTest`) and live (chasm, pillar and
+  open-ground arenas).
 * The live-AI tests written against the 1.3.0 numbers keep testing them exactly, in a test environment
   (`personaldifficulty-gametest:elite_13_ai`) that pins 1.25x, 2x and alerts off; a new test checks the new defaults live (a
   zombie notices an Elite player at 2.5x its vanilla range, never a Normal one). Every GameTest run now starts from the shipped

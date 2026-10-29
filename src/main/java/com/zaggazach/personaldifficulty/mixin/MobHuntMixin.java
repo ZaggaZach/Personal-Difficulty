@@ -48,6 +48,14 @@ abstract class MobHuntMixin implements HuntingMob {
 	private @Nullable UUID personaldifficulty$searchedPlayer;
 	@Unique
 	private long personaldifficulty$searchedTick;
+	@Unique
+	private long personaldifficulty$stallSince;
+	@Unique
+	private double personaldifficulty$stallBest;
+	@Unique
+	private @Nullable UUID personaldifficulty$gaveUpOn;
+	@Unique
+	private long personaldifficulty$gaveUpUntil;
 
 	/**
 	 * Every hostile pathfinding mob gets the last-known-position goal (Phase 5), right after its own goals were registered (vanilla
@@ -131,5 +139,37 @@ abstract class MobHuntMixin implements HuntingMob {
 	public void personaldifficulty$rememberElite(UUID player, long gameTime) {
 		this.personaldifficulty$lastElite = player;
 		this.personaldifficulty$lastEliteSeen = gameTime;
+	}
+
+	@Override
+	public long personaldifficulty$stallSince() {
+		return this.personaldifficulty$stallSince;
+	}
+
+	@Override
+	public double personaldifficulty$stallBest() {
+		return this.personaldifficulty$stallBest;
+	}
+
+	@Override
+	public void personaldifficulty$setStall(long since, double best) {
+		this.personaldifficulty$stallSince = since;
+		this.personaldifficulty$stallBest = best;
+	}
+
+	@Override
+	public @Nullable UUID personaldifficulty$gaveUpOn() {
+		return this.personaldifficulty$gaveUpOn;
+	}
+
+	@Override
+	public long personaldifficulty$gaveUpUntil() {
+		return this.personaldifficulty$gaveUpUntil;
+	}
+
+	@Override
+	public void personaldifficulty$giveUp(@Nullable UUID player, long until) {
+		this.personaldifficulty$gaveUpOn = player;
+		this.personaldifficulty$gaveUpUntil = until;
 	}
 }

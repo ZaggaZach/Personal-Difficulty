@@ -266,8 +266,19 @@ public final class PdHooks {
 		return ai == null || !ai.improvedPursuit() ? vanilla : EliteSurvival.memoryTicks(vanilla, ai.targetMemoryMultiplier());
 	}
 
+	/**
+	 * Distance beyond which {@code mob} gives up hunting {@code target}: as {@link #pursuitDistance(LivingEntity, double)}, except
+	 * that a mob that has given up on an unreachable Elite player ({@code PursuitStall}) uses the vanilla distance for them.
+	 */
+	public static double pursuitDistance(Mob mob, @Nullable LivingEntity target, double vanilla) {
+		return PdHunt.gaveUpOn(mob, target) ? vanilla : pursuitDistance(target, vanilla);
+	}
+
 	/** Path-search length for a mob that is currently hunting an Elite player (its follow-range attribute is untouched). */
 	public static float maxPathLength(Mob mob, float vanilla) {
+		if (PdHunt.gaveUpOn(mob, mob.getTarget())) {
+			return vanilla;
+		}
 		PdConfig.EliteAi ai = eliteAiFor(mob.getTarget());
 		return ai == null ? vanilla : (float) EliteSurvival.cappedRange(vanilla, EliteSurvival.pursuitFactor(ai), ai);
 	}

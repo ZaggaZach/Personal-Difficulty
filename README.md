@@ -187,6 +187,11 @@ walked to the chasm's edge and stopped there, because its route search came back
 did not fix that and made mobs hunting an unreachable player very expensive (+7.7 ms per tick for 30 zombies), so it was not
 kept. The alert network still sends idle mobs to where the player was seen.
 
+**Giving up.** An Elite hunter whose routes keep failing without getting a block closer for 5 seconds (the player is up a pillar,
+across a ravine, behind a wall) gives up the Elite extensions for that player for 30 seconds: beyond its vanilla range it lets
+go of them, inside it hunts on exactly as a vanilla mob would. Mobs hunting a player they can never reach would otherwise keep
+repeating failing route searches at a measurable cost. A reachable player is never given up.
+
 Performance (200 hostile mobs, 5 Elite players, 16-thread desktop): 3x detection, 5x memory and the alert network together
 measured within the plan's 1 ms-per-tick budget over the no-Elite baseline in every run (+0.24, -0.05, -0.05, +0.67, -0.02 ms;
 run-to-run noise is about 0.3-0.5 ms). Detection range is the costliest part (+0.3 to +0.9 ms); lower the multiplier or the cap if a server

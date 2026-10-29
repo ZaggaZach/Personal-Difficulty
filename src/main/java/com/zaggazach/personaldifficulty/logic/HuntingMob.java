@@ -33,4 +33,18 @@ public interface HuntingMob {
 	long personaldifficulty$searchedTick();
 
 	void personaldifficulty$markSearched(UUID player, long sightingTick);
+
+	/** Pursuit-stall watch (see {@code PursuitStall}): the tick it started (0 = not watching) and the best distance since. */
+	long personaldifficulty$stallSince();
+
+	double personaldifficulty$stallBest();
+
+	void personaldifficulty$setStall(long since, double best);
+
+	/** The Elite player this mob gave up the Elite extensions for (null if none), and until which game tick. */
+	@Nullable UUID personaldifficulty$gaveUpOn();
+
+	long personaldifficulty$gaveUpUntil();
+
+	void personaldifficulty$giveUp(@Nullable UUID player, long until);
 }

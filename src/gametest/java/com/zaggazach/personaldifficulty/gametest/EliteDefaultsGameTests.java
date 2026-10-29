@@ -2,6 +2,7 @@ package com.zaggazach.personaldifficulty.gametest;
 
 import static com.zaggazach.personaldifficulty.gametest.PdTestSupport.*;
 
+import com.zaggazach.personaldifficulty.PdHunt;
 import com.zaggazach.personaldifficulty.PersonalDifficultyMode;
 import com.zaggazach.personaldifficulty.config.PdConfig;
 import com.zaggazach.personaldifficulty.gametest.EliteAiGameTests.Arena;
@@ -120,6 +121,97 @@ public class EliteDefaultsGameTests {
 			}
 			open.close();
 			chasm.close();
+			h.succeed();
+		});
+	}
+
+	// ------------------------------------------------------------------ giving up on an unreachable Elite player
+
+	/**
+	 * PursuitStall, live, three arenas:
+	 * <ul>
+	 * <li><b>chasm</b>: a zombie hunting an Elite player 2.8x its vanilla range away walks to the edge of a chasm it cannot cross,
+	 * makes no progress for five seconds, gives up: the player is beyond its vanilla range, so it lets go of them and does not
+	 * take them back during the 30-second retry delay;</li>
+	 * <li><b>pillar</b>: a zombie hunting an Elite player on top of an 8-block pillar gives up the Elite extensions too, but the
+	 * player is inside its vanilla range, so it keeps hunting them exactly as a vanilla zombie would;</li>
+	 * <li><b>open</b> (control): a zombie hunting an Elite player on open ground (complete routes, steady progress) never gives up.</li>
+	 * </ul>
+	 */
+	@GameTest(maxTicks = 760)
+	public void ai_stall_aZombieGivesUpOnAnUnreachableElitePlayer_neverOnAReachableOne(GameTestHelper h) {
+		Arena chasm = new Arena(h, 100);
+		Arena pillar = new Arena(h, 101);
+		Arena open = new Arena(h, 102);
+		for (int x = 40; x <= 44; x++) { // as in the long-pursuit measurement: too wide to jump, nothing blocks sight
+			for (int z = -4; z <= 70; z++) {
+				chasm.level.setBlock(new net.minecraft.core.BlockPos(chasm.x0 + x, chasm.y, chasm.z0 + z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 18);
+			}
+		}
+		int px = 60;
+		int pz = 50;
+		for (int dy = 1; dy <= 8; dy++) {
+			pillar.level.setBlock(new net.minecraft.core.BlockPos(pillar.x0 + px, pillar.y + dy, pillar.z0 + pz), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), 18);
+		}
+		Mob mC = chasm.spawn(EntityTypes.ZOMBIE, 5, 5);
+		Mob mP = pillar.spawn(EntityTypes.ZOMBIE, px - 30, pz);
+		Mob mO = open.spawn(EntityTypes.ZOMBIE, 5, 5);
+		ServerPlayer pC = chasm.player(h, "pd_st_c", PersonalDifficultyMode.ELITE, 5 + EliteAiGameTests.followRange(mC) * 2.8, 5);
+		ServerPlayer pP = pillar.player(h, "pd_st_p", PersonalDifficultyMode.ELITE, px, pz);
+		ServerPlayer pO = open.player(h, "pd_st_o", PersonalDifficultyMode.ELITE, 5 + EliteAiGameTests.followRange(mO) * 2.5, 5);
+		for (ServerPlayer p : java.util.List.of(pC, pP, pO)) {
+			p.addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 100000, 4, false, false));
+		}
+		long[] chasmDroppedAt = {-1};
+		int[] chasmRetaken = {0};
+		long[] pillarGaveUpAt = {-1};
+		int[] pillarHeldAfter = {0};
+		int[] pillarTicksAfter = {0};
+		int[] openHeld = {0};
+		int[] openTicks = {0};
+		boolean[] openGaveUp = {false};
+		everyTick(h, () -> {
+			tickPlayer(pC);
+			tickPlayer(pP);
+			tickPlayer(pO);
+			pP.snapTo(pillar.x0 + px + 0.5, pillar.y + 9, pillar.z0 + pz + 0.5); // stays on top
+			long t = h.getTick();
+			if (t == 5) {
+				mC.setTarget(pC);
+				mP.setTarget(pP);
+				mO.setTarget(pO);
+			}
+			if (t <= 5) {
+				return;
+			}
+			if (chasmDroppedAt[0] < 0 && mC.getTarget() != pC) {
+				chasmDroppedAt[0] = t;
+			} else if (chasmDroppedAt[0] >= 0 && mC.getTarget() == pC) {
+				chasmRetaken[0]++;
+			}
+			if (pillarGaveUpAt[0] < 0 && PdHunt.gaveUpOn(mP, pP)) {
+				pillarGaveUpAt[0] = t;
+			} else if (pillarGaveUpAt[0] >= 0) {
+				pillarTicksAfter[0]++;
+				pillarHeldAfter[0] += mP.getTarget() == pP ? 1 : 0;
+			}
+			openTicks[0]++;
+			openHeld[0] += mO.getTarget() == pO ? 1 : 0;
+			openGaveUp[0] |= PdHunt.gaveUpOn(mO, pO);
+		});
+		at(h, 740, () -> {
+			String report = String.format(java.util.Locale.ROOT,
+				"STALL chasm: dropped at tick %d, re-taken for %d ticks after | pillar: gave up at tick %d, then held %d/%d ticks (vanilla range) | open: held %d/%d, gave up %b",
+				chasmDroppedAt[0], chasmRetaken[0], pillarGaveUpAt[0], pillarHeldAfter[0], pillarTicksAfter[0], openHeld[0], openTicks[0], openGaveUp[0]);
+			System.out.println(report);
+			check(chasmDroppedAt[0] > 0, "chasm: the zombie gave up on the Elite player it could not reach: " + report);
+			check(chasmRetaken[0] == 0, "chasm: and did not take them back during the retry delay: " + report);
+			check(pillarGaveUpAt[0] > 0, "pillar: the Elite extensions were given up: " + report);
+			check(pillarHeldAfter[0] > pillarTicksAfter[0] / 2, "pillar: inside its vanilla range the zombie still hunts, as vanilla would: " + report);
+			check(!openGaveUp[0] && openHeld[0] == openTicks[0], "open: a reachable Elite player is never given up: " + report);
+			chasm.close();
+			pillar.close();
+			open.close();
 			h.succeed();
 		});
 	}
