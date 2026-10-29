@@ -193,8 +193,9 @@ go of them, inside it hunts on exactly as a vanilla mob would. Mobs hunting a pl
 repeating failing route searches at a measurable cost. A reachable player is never given up.
 
 Performance (200 hostile mobs, 5 Elite players, 16-thread desktop): 3x detection, 5x memory and the alert network together
-measured within the plan's 1 ms-per-tick budget over the no-Elite baseline in every run (+0.24, -0.05, -0.05, +0.67, -0.02 ms;
-run-to-run noise is about 0.3-0.5 ms). Detection range is the costliest part (+0.3 to +0.9 ms); lower the multiplier or the cap if a server
+measured within the plan's 1 ms-per-tick budget over the no-Elite baseline in every run (from -0.05 to +0.67 ms; run-to-run
+noise is about 0.3-0.5 ms). Worst case, 30 zombies around an Elite player they cannot reach (on a pillar): +0.74 ms over the
+same hunt by vanilla mobs. Detection range is the costliest part (+0.3 to +0.9 ms); lower the multiplier or the cap if a server
 is short of tick time.
 
 #### Elite combat effects (1.3.0)

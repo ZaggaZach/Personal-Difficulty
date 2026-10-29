@@ -1,8 +1,13 @@
 # Changelog
 
-## Unreleased: Phase 5 of the 1.4.0 line (Elite hunting core), in progress
+## 1.3.1-rc.4: UNPUBLISHED development checkpoint (Phase 5 of the 1.4.0 line: Elite hunting core)
 
-### Added so far
+> **Status: a private checkpoint, NOT published.** Builds on `1.3.1-rc.3`.
+>
+> **Phase 5 build: PASSED (29 October 2026).** `./gradlew build -PpdPerf=true` green: unit tests and all 174 required
+> GameTests, both performance measurements within target. **In-game test: pending.**
+
+### Added
 * `elite.ai.absolute-range-cap` (default **128** blocks, 16 .. 256) replaces the fixed 64-block cap of 1.3.0.
 * The Elite range multipliers may now go up to **3.0** (were 2.0) and the memory multiplier up to **5.0** (was 4.0).
 * **Changed defaults** (plan C2, after the performance gate passed): `elite.ai.acquisition-range-multiplier` **3.0** (was 1.25),
@@ -14,10 +19,11 @@
   `elite.alert.hops` 2, `elite.alert.memory-seconds` 60): a mob that SEES an Elite player records where and when; hostile mobs
   near it learn of that sighting (passed on at most `hops` times) and, if they have no target, walk to that remembered point with
   ordinary pathfinding, re-planning from the end of a partial route for up to 30 seconds. Nobody is told where the player is
-  now. Each mob searches a sighting once. The board is bounded (64 players per level, 32 relay mobs per sighting).
+  now. Each mob searches a sighting once; after a search that did not reach the point it ignores that player's sightings for
+  10 s. The board is bounded (64 players per level, 32 relay mobs per sighting).
 * All new settings are on the "Elite hunting and effects" settings page.
 
-### Tests so far
+### Tests
 * Unit: the alert board (radius edge, hop limit, expiry, caps, staleness, eligibility, once-only search); the raised limits and
   the cap; the differential loader test leaves out only values above the old maximums of the three raised keys.
 * GameTests: a live listener zombie walks to where a sentry saw an Elite player and not to where the player hid; a Normal
@@ -39,6 +45,14 @@
   chasm result unchanged, and at 9x 30 zombies hunting an Elite player on an unreachable pillar cost +7.73 ms per tick (p95
   25 ms; new opt-in measurement `perf_unreachablePlayer_30HuntersThatCanNeverReachThem`). The plan's waypoint hops would
   end at the same edge, so they were not built.
+* **Worst case, final: PASSED.** 30 zombies around an Elite player on an unreachable pillar. Near (18-26 blocks, vanilla hunts
+  the player too): the mod adds **+0.74 ms** per tick (target 1 ms; was +1.5 to +2.3 ms before the two fixes below). Far (44-58
+  blocks, only Elite players are hunted from there): +0.67 ms for the extra ~13 hunters. Main measurement in the same run:
+  +0.31 ms. Getting there took three findings, each confirmed with counters in the measurement: (1) hunters re-planning
+  failing routes (fixed by giving up, below); (2) idle zombies starting a new failing last-known search after every fresh
+  sighting (fixed: a failed search covers that player for 10 s); (3) hidden-reacquire route checks (rare here, but each failure
+  now pauses that mob's checks for 3 s). A sampler records the server thread's stack whenever a tick runs over 300 ms; none did
+  in the last three runs (two earlier runs each had one ~1.7 s tick in the same window; not reproduced, cause unknown).
 * **Giving up on an unreachable Elite player** (new). Measured worst case: 30 zombies hunting an Elite player they could never
   reach (on top of a pillar) cost about +1.0 to +1.5 ms per tick, because every route search fails and is repeated. Now an Elite
   hunter whose routes keep failing without getting a block closer for 5 seconds gives up the Elite extensions for that player
