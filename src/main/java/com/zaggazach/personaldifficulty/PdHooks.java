@@ -272,6 +272,18 @@ public final class PdHooks {
 		return ai == null ? vanilla : (float) EliteSurvival.cappedRange(vanilla, EliteSurvival.pursuitFactor(ai), ai);
 	}
 
+	/**
+	 * The path search's visited-node multiplier for a mob hunting an Elite player: vanilla's multiplier times the factor by which
+	 * {@link #maxPathLength} stretched the search (so the budget stays at vanilla's 16 nodes per block of search length).
+	 */
+	public static float visitedNodesMultiplier(Mob mob, float followRange, float vanilla) {
+		if (!(followRange > 0)) {
+			return vanilla;
+		}
+		float stretched = maxPathLength(mob, followRange);
+		return stretched > followRange ? vanilla * (stretched / followRange) : vanilla;
+	}
+
 	/** Melee mobs' "should I start chasing?" re-check delay. */
 	public static long meleeRecheckTicks(Mob mob, long vanilla) {
 		PdConfig.EliteAi ai = eliteAiFor(mob.getTarget());
