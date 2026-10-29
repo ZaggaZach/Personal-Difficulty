@@ -4,6 +4,17 @@
 
 > **Status: a private checkpoint, NOT published.** Built from `1.3.1-rc.1` (commit `5d40840`) after testing that RC's admin menu in a
 > real client. `rc.1` and its tag are untouched.
+>
+> **Phase 3 manual testing: PASSED (29 October 2026).** Tested on a dedicated Fabric 26.3 server (Fabric Loader 0.20.1, Fabric API
+> 0.165.0+26.3, Java 25) from an unmodified Minecraft 26.3 client, by an operator:
+> * display: main menu, player list with real player-head skins and tooltips, player page, Server Difficulties, empty slots, the
+>   navigation bar and the Peaceful-to-Elite order on every page;
+> * controls: Set difficulty (including "already ...; nothing changed"), Lock on/off (a locked player's own `/personaldifficulty` is
+>   refused; an administrator can still assign), allowed list Save with the Switch / Keep / Cancel choice, Allow all, Reset with its
+>   confirmation and Cancel, and Server Difficulties ON/OFF;
+> * persistence: lock, allowed list and difficulty survive a disconnect/reconnect and a server restart.
+>
+> Automated: unit tests pass; in-server GameTests pass apart from the two timing-sensitive mob-AI tests listed under Known gaps.
 
 ### Changed
 * **Difficulty order is now Peaceful, Easy, Normal, Hard, Elite everywhere**: menus, command suggestions, "Known: ..." lists and
