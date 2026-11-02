@@ -136,6 +136,8 @@ public final class SettingRegistry {
 		e.add(whole(o += 10, "elite.creeper.fuse-ticks", PdConfig.MIN_CREEPER_FUSE_TICKS, PdConfig.VANILLA_CREEPER_FUSE_TICKS, mobs.creeperFuseTicks(), "Elite creepers: fuse (ticks)", live, "eliteMobs.creeperFuseTicks", c -> c.eliteMobs().creeperFuseTicks()));
 		e.add(flag(o += 10, "elite.pillager.fast-crossbow", mobs.pillagerFastCrossbow(), "Elite pillagers: fire sooner", live, "eliteMobs.pillagerFastCrossbow", c -> c.eliteMobs().pillagerFastCrossbow()));
 		e.add(whole(o += 10, "elite.pillager.attack-delay-ticks", 1, PdConfig.MAX_CROSSBOW_DELAY_TICKS, mobs.pillagerAttackDelayTicks(), "Elite pillagers: wait after charging (ticks)", live, "eliteMobs.pillagerAttackDelayTicks", c -> c.eliteMobs().pillagerAttackDelayTicks()));
+		e.add(flag(o += 10, "elite.warden.enabled", mobs.wardenAnger(), "Elite Wardens: faster anger", live, "eliteMobs.wardenAnger", c -> c.eliteMobs().wardenAnger()));
+		e.add(num(o += 10, "elite.warden.anger-multiplier", 1, PdConfig.MAX_WARDEN_ANGER_MULTIPLIER, mobs.wardenAngerMultiplier(), 0.1, "Elite Wardens: anger multiplier", live, "eliteMobs.wardenAngerMultiplier", c -> c.eliteMobs().wardenAngerMultiplier()));
 		// Elite mob effects
 		e.add(flag(o += 10, "elite.effects.enabled", true, "Elite effects: enabled", live, "eliteEffects.enabled", c -> c.eliteEffects().enabled()));
 		e.add(whole(o += 10, "elite.effects.max-duration-seconds", 1, PdConfig.MAX_EFFECT_SECONDS, 30, "Elite effects: maximum duration (seconds)", live, "eliteEffects.maxDurationSeconds", c -> c.eliteEffects().maxDurationSeconds()));

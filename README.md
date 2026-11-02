@@ -220,6 +220,10 @@ Each applies only while the mob is hunting an **Elite** player.
 | `elite.creeper.fuse-ticks` | **20** | The shortened fuse (15 .. 30 ticks). |
 | `elite.pillager.fast-crossbow` | **true** | Pillagers fire sooner after charging their crossbow. |
 | `elite.pillager.attack-delay-ticks` | **5** | Their wait after charging (1 .. 40 ticks; vanilla 20 to 39). The charge itself is unchanged. |
+| `elite.warden.enabled` | **false** | Wardens get angry at Elite players faster: anger from their own senses (vibrations, smell, being hit) is multiplied. No extra range, nothing through walls. |
+| `elite.warden.anger-multiplier` | **2.0** | The factor (1.0 .. 3.0): 2.0 means two vibrations instead of three before it attacks. |
+
+Not affected: piglins, piglin brutes, hoglins and zoglins (brain-based AI; deferred), ghasts and magma cubes.
 
 #### Alert network and last-known-position search (1.4.0)
 A mob that **sees** an Elite player records where and when. Hostile mobs near it (`elite.alert.radius`, default 64 blocks) learn
@@ -419,6 +423,8 @@ elite.creeper.short-fuse=false
 elite.creeper.fuse-ticks=20                    # 15 .. 30
 elite.pillager.fast-crossbow=true
 elite.pillager.attack-delay-ticks=5            # 1 .. 40
+elite.warden.enabled=false
+elite.warden.anger-multiplier=2.0              # 1.0 .. 3.0
 elite.effects.enabled=true
 elite.effects.max-duration-seconds=30         # 1 .. 60
 elite.effects.zombie-infection-chance=0.35    # per damaging hit, 0 .. 1

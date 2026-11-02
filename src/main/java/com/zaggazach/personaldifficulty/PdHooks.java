@@ -333,6 +333,19 @@ public final class PdHooks {
 		return m == null || !m.pillagerFastCrossbow() ? vanilla : Math.min(vanilla, Math.max(1, m.pillagerAttackDelayTicks()));
 	}
 
+	/**
+	 * Phase 7: anger a Warden gains toward {@code entity} through vanilla's own {@code increaseAngerAt} (its vibration listener,
+	 * sniffing, being hurt), multiplied for an Elite player when {@code elite.warden.enabled} is on. Positive amounts only; vanilla
+	 * still caps the total.
+	 */
+	public static int wardenAnger(@Nullable Entity entity, int vanilla) {
+		if (vanilla <= 0 || eliteAiFor(entity) == null) {
+			return vanilla;
+		}
+		PdConfig.EliteMobs m = PdRuntime.get().config().eliteMobs();
+		return m.wardenAnger() ? (int) Math.round(vanilla * m.wardenAngerMultiplier()) : vanilla;
+	}
+
 	/** The Elite skeleton settings if {@code target} is an Elite player and they are switched on, else null. */
 	public static PdConfig.@Nullable EliteSkeleton eliteSkeletonFor(@Nullable Entity target) {
 		if (eliteAiFor(target) == null) {

@@ -48,7 +48,8 @@ public final class ConfigAssembler {
 				b(values, "elite.enderman.blindside-enabled"), d(values, "elite.enderman.blindside-chance"), i(values, "elite.enderman.blindside-distance")),
 			new PdConfig.EliteMobs(
 				b(values, "elite.zombie.break-doors"), b(values, "elite.creeper.short-fuse"), i(values, "elite.creeper.fuse-ticks"),
-				b(values, "elite.pillager.fast-crossbow"), i(values, "elite.pillager.attack-delay-ticks"))
+				b(values, "elite.pillager.fast-crossbow"), i(values, "elite.pillager.attack-delay-ticks"),
+				b(values, "elite.warden.enabled"), d(values, "elite.warden.anger-multiplier"))
 		);
 	}
 

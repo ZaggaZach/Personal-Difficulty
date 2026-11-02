@@ -222,12 +222,17 @@ public record PdConfig(
 	 * @param creeperFuseTicks the shortened fuse
 	 * @param pillagerFastCrossbow pillagers fire sooner after charging their crossbow
 	 * @param pillagerAttackDelayTicks the wait after charging (vanilla 20 to 39 ticks); the charge itself is unchanged
+	 * @param wardenAnger Wardens gain anger toward Elite players faster (Phase 7)
+	 * @param wardenAngerMultiplier factor on the anger vanilla's own senses give the Warden toward an Elite player
 	 */
 	public record EliteMobs(boolean zombieBreakDoors, boolean creeperShortFuse, int creeperFuseTicks, boolean pillagerFastCrossbow,
-		int pillagerAttackDelayTicks) {
-		/** Door-breaking and the creeper fuse ship OFF (plan C2); the pillager change ships on. */
-		public static final EliteMobs DEFAULTS = new EliteMobs(false, false, 20, true, 5);
+		int pillagerAttackDelayTicks, boolean wardenAnger, double wardenAngerMultiplier) {
+		/** Door-breaking, the creeper fuse and the Warden ship OFF (plan C2, section 8); the pillager change ships on. */
+		public static final EliteMobs DEFAULTS = new EliteMobs(false, false, 20, true, 5, false, 2.0);
 	}
+
+	/** Bounds of {@code elite.warden.anger-multiplier}. */
+	public static final double MAX_WARDEN_ANGER_MULTIPLIER = 3.0;
 
 	/** One attacker family's effect: probability per successful hit and base duration. */
 	public record MobEffectSetting(double chance, int seconds) {
