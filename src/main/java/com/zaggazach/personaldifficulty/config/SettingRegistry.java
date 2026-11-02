@@ -116,6 +116,14 @@ public final class SettingRegistry {
 		e.add(whole(o += 10, "elite.alert.radius", PdConfig.MIN_ALERT_RADIUS, PdConfig.MAX_ALERT_RADIUS, PdConfig.EliteAlert.DEFAULTS.radius(), "Elite hunting: alert radius (blocks)", scan, "eliteAlert.radius", c -> c.eliteAlert().radius()));
 		e.add(whole(o += 10, "elite.alert.hops", 0, PdConfig.MAX_ALERT_HOPS, PdConfig.EliteAlert.DEFAULTS.hops(), "Elite hunting: alert hops", scan, "eliteAlert.hops", c -> c.eliteAlert().hops()));
 		e.add(whole(o += 10, "elite.alert.memory-seconds", PdConfig.MIN_ALERT_MEMORY_SECONDS, PdConfig.MAX_ALERT_MEMORY_SECONDS, PdConfig.EliteAlert.DEFAULTS.memorySeconds(), "Elite hunting: alert memory (seconds)", scan, "eliteAlert.memorySeconds", c -> c.eliteAlert().memorySeconds()));
+		// Elite skeletons (1.4.0, Phase 6)
+		PdConfig.EliteSkeleton sk = PdConfig.EliteSkeleton.DEFAULTS;
+		e.add(flag(o += 10, "elite.skeleton.enabled", sk.enabled(), "Elite skeletons: enabled", live, "eliteSkeleton.enabled", c -> c.eliteSkeleton().enabled()));
+		e.add(num(o += 10, "elite.skeleton.arrow-speed-multiplier", 1, PdConfig.MAX_ARROW_SPEED_MULTIPLIER, sk.arrowSpeedMultiplier(), 0.1, "Elite skeletons: arrow speed multiplier", live, "eliteSkeleton.arrowSpeedMultiplier", c -> c.eliteSkeleton().arrowSpeedMultiplier()));
+		e.add(num(o += 10, "elite.skeleton.arrow-damage-multiplier", PdConfig.MIN_ARROW_DAMAGE_MULTIPLIER, PdConfig.MAX_ARROW_DAMAGE_MULTIPLIER, sk.arrowDamageMultiplier(), 0.05, "Elite skeletons: arrow damage multiplier", live, "eliteSkeleton.arrowDamageMultiplier", c -> c.eliteSkeleton().arrowDamageMultiplier()));
+		e.add(num(o += 10, "elite.skeleton.prediction-strength", 0, 1, sk.predictionStrength(), 0.05, "Elite skeletons: aim prediction strength", live, "eliteSkeleton.predictionStrength", c -> c.eliteSkeleton().predictionStrength()));
+		e.add(whole(o += 10, "elite.skeleton.max-range", PdConfig.VANILLA_BOW_RANGE, PdConfig.MAX_BOW_RANGE, sk.maxRange(), "Elite skeletons: shooting range (blocks)", live, "eliteSkeleton.maxRange", c -> c.eliteSkeleton().maxRange()));
+		e.add(whole(o += 10, "elite.skeleton.firing-interval-ticks", PdConfig.MIN_FIRING_INTERVAL_TICKS, PdConfig.MAX_FIRING_INTERVAL_TICKS, sk.firingIntervalTicks(), "Elite skeletons: firing interval (ticks)", live, "eliteSkeleton.firingIntervalTicks", c -> c.eliteSkeleton().firingIntervalTicks()));
 		// Elite mob effects
 		e.add(flag(o += 10, "elite.effects.enabled", true, "Elite effects: enabled", live, "eliteEffects.enabled", c -> c.eliteEffects().enabled()));
 		e.add(whole(o += 10, "elite.effects.max-duration-seconds", 1, PdConfig.MAX_EFFECT_SECONDS, 30, "Elite effects: maximum duration (seconds)", live, "eliteEffects.maxDurationSeconds", c -> c.eliteEffects().maxDurationSeconds()));

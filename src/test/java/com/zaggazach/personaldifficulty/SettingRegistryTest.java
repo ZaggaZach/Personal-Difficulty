@@ -91,7 +91,7 @@ class SettingRegistryTest {
 		Set<String> inRegistry = new TreeSet<>();
 		SettingRegistry.scalars().forEach(d -> inRegistry.add(d.key()));
 		assertEquals(inFile, inRegistry);
-		assertEquals(46, inRegistry.size());
+		assertEquals(52, inRegistry.size()); // 1.4.0 Phase 6: +6 elite.skeleton.*
 	}
 
 	@Test

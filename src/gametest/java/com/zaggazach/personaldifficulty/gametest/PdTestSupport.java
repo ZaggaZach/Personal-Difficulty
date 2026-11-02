@@ -45,9 +45,9 @@ public final class PdTestSupport {
 
 	/**
 	 * Test environment for the live-AI tests written against the 1.3.0 Elite hunting numbers (1.25x detection, 2x memory, no alert
-	 * network). Since 1.4.0 the defaults are 3x, 5x and alerts on; those tests keep checking the exact 1.3.0 behaviour (still
-	 * reachable through the settings) by running in this environment, whose setup pins the three values as overrides and whose
-	 * teardown removes them. The new defaults are tested live in the default environment ({@code EliteDefaultsGameTests}).
+	 * network, 1.3.0 skeletons). Since 1.4.0 the defaults are 3x, 5x, alerts on and the Elite skeleton settings on; those tests keep
+	 * checking the exact 1.3.0 behaviour (still reachable through the settings) by running in this environment, whose setup pins
+	 * those values as overrides and whose teardown removes them. The new defaults are tested live in the default environment ({@code EliteDefaultsGameTests}).
 	 */
 	public static final String LEGACY_AI = "personaldifficulty-gametest:elite_13_ai";
 
@@ -332,7 +332,13 @@ public final class PdTestSupport {
 	}
 
 	private static void sameSpeedAndDamage(String what, Sample a, Sample b) {
-		check(Math.abs(a.meanSpeed() - b.meanSpeed()) / b.meanSpeed() < 0.03, what + ": projectile speed must not be substituted for aim");
+		sameSpeedAndDamage(what, a, b, 1.0);
+	}
+
+	/** As above, with {@code a}'s launch speed expected to be {@code speedRatio} times {@code b}'s (the Elite skeleton setting). */
+	private static void sameSpeedAndDamage(String what, Sample a, Sample b, double speedRatio) {
+		check(Math.abs(a.meanSpeed() / speedRatio - b.meanSpeed()) / b.meanSpeed() < 0.03,
+			what + ": projectile speed must be " + speedRatio + "x (" + a.meanSpeed() + " vs " + b.meanSpeed() + "), never a substitute for aim");
 		if (!Double.isNaN(a.baseDamage())) {
 			// vanilla randomises per-arrow damage (gaussian + difficulty term), so compare means
 			check(Math.abs(a.baseDamage() - b.baseDamage()) < 0.06, what + ": arrow damage must not be substituted for aim (" + a.baseDamage() + " vs " + b.baseDamage() + ")");
@@ -352,6 +358,16 @@ public final class PdTestSupport {
 	}
 
 	public static void expectTighter(String what, Sample elite, Sample normal, Sample nonPlayer, double vanillaUncertainty, double eliteMax) {
+		expectTighter(what, elite, normal, nonPlayer, vanillaUncertainty, eliteMax, 1.0);
+	}
+
+	/** The launch-speed ratio of an Elite skeleton-family shot to a vanilla one under the current settings (1.0 when off). */
+	public static double eliteSkeletonSpeedRatio() {
+		var sk = rt().config().eliteSkeleton();
+		return sk.enabled() ? sk.arrowSpeedMultiplier() : 1.0;
+	}
+
+	public static void expectTighter(String what, Sample elite, Sample normal, Sample nonPlayer, double vanillaUncertainty, double eliteMax, double eliteSpeedRatio) {
 		System.out.printf("AIM-SPREAD %s: elite %.5f normal %.5f non-player %.5f (vanilla uncertainty %.0f, elite max %.2f)%n", what, elite.spread(), normal.spread(), nonPlayer.spread(), vanillaUncertainty, eliteMax);
 		double expectedRatio = Math.min(vanillaUncertainty, eliteMax) / vanillaUncertainty;
 		check(expectedRatio <= 0.6, "test would be vacuous: world difficulty gives vanilla uncertainty " + vanillaUncertainty);
@@ -360,7 +376,7 @@ public final class PdTestSupport {
 		check(elite.spread() > 0.0, what + ": Elite must not be a zero-spread guaranteed hit");
 		check(Math.abs(normal.spread() - nonPlayer.spread()) / nonPlayer.spread() < 0.12,
 			what + ": a Normal player must be shot at exactly like a non-player target (normal=" + normal.spread() + ", mob=" + nonPlayer.spread() + ")");
-		sameSpeedAndDamage(what, elite, normal);
+		sameSpeedAndDamage(what, elite, normal, eliteSpeedRatio);
 	}
 
 	// ------------------------------------------------------------------ commands

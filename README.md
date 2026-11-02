@@ -174,6 +174,26 @@ pillager, and (1.4.0) the witch: a live test shows it acquires an Elite player b
 one (1.2.0 had found none; the cause was its targeting goal's raid-healing flag, explained in the changelog). **Not verified,
 so not claimed:** every other mob (see `docs/VERIFICATION.md`).
 
+#### Elite skeletons (1.4.0)
+Skeletons, strays and bogged shooting at an **Elite** player; any other target gets the vanilla shot.
+
+| Setting | Default | Effect |
+|---|---|---|
+| `elite.skeleton.enabled` | **true** | Master switch. Off: 1.3.0 behaviour (Hard cadence via `elite.ai.advanced-combat`). |
+| `elite.skeleton.arrow-speed-multiplier` | **1.5** | Launch speed (1.0 .. 3.0) relative to vanilla's 1.6. |
+| `elite.skeleton.arrow-damage-multiplier` | **1.0** | Scale on the arrow's base damage (0.1 .. 3.0). |
+| `elite.skeleton.prediction-strength` | **1.0** | 0 = vanilla aim at where the player is; 1 = aim at where they will be when the arrow arrives, from their movement. |
+| `elite.skeleton.max-range` | **24** | Blocks within which the skeleton starts shooting (15 .. 48; vanilla 15). |
+| `elite.skeleton.firing-interval-ticks` | **10** | Ticks between shots after one is released (10 .. 60; vanilla 40, Hard 20). The 20-tick bow draw is never shortened. |
+
+* **Aim.** Vanilla aims with a fixed arc allowance made for its own arrow speed. The Elite shot solves the arc with vanilla's own
+  arrow physics for the actual launch speed, and leads a moving player by their last reported movement (iterated: flight time,
+  predicted position, new flight time). Vertical motion is ignored, the shot's random spread still applies, and a player who
+  changes direction after the release still dodges.
+* **Speed and damage are separate.** Vanilla arrow damage already grows with the arrow's speed when it hits, so faster arrows can
+  hit harder on their own; nothing compensates for that automatically. Measured numbers: see `docs/VERIFICATION.md` (opt-in
+  measurement `measure_skeletonArrowDamageAtDistance_forSeveralArrowSpeeds`).
+
 #### Alert network and last-known-position search (1.4.0)
 A mob that **sees** an Elite player records where and when. Hostile mobs near it (`elite.alert.radius`, default 64 blocks) learn
 of that sighting, and may pass it on (`elite.alert.hops`, default 2). A mob with no target then walks to the **remembered point**
@@ -358,6 +378,12 @@ elite.alert.enabled=true                      # mobs pass on where they saw an E
 elite.alert.radius=64                         # 8 .. 128 blocks
 elite.alert.hops=2                            # 0 .. 4
 elite.alert.memory-seconds=60                 # 5 .. 300
+elite.skeleton.enabled=true
+elite.skeleton.arrow-speed-multiplier=1.5      # 1.0 .. 3.0
+elite.skeleton.arrow-damage-multiplier=1.0     # 0.1 .. 3.0
+elite.skeleton.prediction-strength=1.0         # 0 .. 1
+elite.skeleton.max-range=24                    # 15 .. 48 blocks
+elite.skeleton.firing-interval-ticks=10        # 10 .. 60
 elite.effects.enabled=true
 elite.effects.max-duration-seconds=30         # 1 .. 60
 elite.effects.zombie-infection-chance=0.35    # per damaging hit, 0 .. 1

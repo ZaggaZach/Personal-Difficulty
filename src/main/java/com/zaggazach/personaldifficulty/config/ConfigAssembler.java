@@ -40,7 +40,10 @@ public final class ConfigAssembler {
 				effect(values, "elite.effects.cave-spider-venom"), effect(values, "elite.effects.skeleton-shot"),
 				effect(values, "elite.effects.drowned-chill")),
 			new PdConfig.EliteAlert(
-				b(values, "elite.alert.enabled"), i(values, "elite.alert.radius"), i(values, "elite.alert.hops"), i(values, "elite.alert.memory-seconds"))
+				b(values, "elite.alert.enabled"), i(values, "elite.alert.radius"), i(values, "elite.alert.hops"), i(values, "elite.alert.memory-seconds")),
+			new PdConfig.EliteSkeleton(
+				b(values, "elite.skeleton.enabled"), d(values, "elite.skeleton.arrow-speed-multiplier"), d(values, "elite.skeleton.arrow-damage-multiplier"),
+				d(values, "elite.skeleton.prediction-strength"), i(values, "elite.skeleton.max-range"), i(values, "elite.skeleton.firing-interval-ticks"))
 		);
 	}
 

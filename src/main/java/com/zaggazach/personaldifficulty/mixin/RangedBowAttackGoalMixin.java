@@ -28,4 +28,16 @@ abstract class RangedBowAttackGoalMixin {
 	private int personaldifficulty$eliteTargetsGetHardCadence(int interval) {
 		return PdHooks.bowInterval(this.mob, interval);
 	}
+
+	/**
+	 * 1.4.0 (Phase 6): the shooting range against an Elite player ({@code elite.skeleton.max-range}, vanilla 15 blocks). Read
+	 * where vanilla decides whether to close in or stand and shoot, from the current target.
+	 */
+	@ModifyExpressionValue(
+		method = "tick",
+		at = @At(value = "FIELD", target = "Lnet/minecraft/world/entity/ai/goal/RangedBowAttackGoal;attackRadiusSqr:F", opcode = Opcodes.GETFIELD)
+	)
+	private float personaldifficulty$eliteTargetsGetTheEliteRange(float radiusSqr) {
+		return PdHooks.bowRangeSqr(this.mob, radiusSqr);
+	}
 }

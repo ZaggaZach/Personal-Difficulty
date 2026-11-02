@@ -23,8 +23,19 @@ public record PdConfig(
 	EliteAi eliteAi,
 	EliteHunt eliteHunt,
 	EliteEffects eliteEffects,
-	EliteAlert eliteAlert
+	EliteAlert eliteAlert,
+	EliteSkeleton eliteSkeleton
 ) {
+	/** The form used before the Elite skeleton settings existed (Phase 5 and earlier); those settings are the defaults. */
+	public PdConfig(Profile easy, Profile hard, Profile elite, double easyRangedMinUncertainty, double eliteRangedMaxUncertainty,
+		double eliteArmorEffectiveness, double eliteRegenMultiplier, double pvpDamageMultiplier, double selfDamageMultiplier,
+		boolean environmentalApplyProfile, boolean voidApplyProfile, boolean adminApplyProfile, RangedMobs rangedMobs, EliteAi eliteAi,
+		EliteHunt eliteHunt, EliteEffects eliteEffects, EliteAlert eliteAlert) {
+		this(easy, hard, elite, easyRangedMinUncertainty, eliteRangedMaxUncertainty, eliteArmorEffectiveness, eliteRegenMultiplier,
+			pvpDamageMultiplier, selfDamageMultiplier, environmentalApplyProfile, voidApplyProfile, adminApplyProfile, rangedMobs, eliteAi,
+			eliteHunt, eliteEffects, eliteAlert, EliteSkeleton.DEFAULTS);
+	}
+
 	/** The form used before the alert network existed (tests and the frozen 1.3.0 oracle); the alert settings are the defaults. */
 	public PdConfig(Profile easy, Profile hard, Profile elite, double easyRangedMinUncertainty, double eliteRangedMaxUncertainty,
 		double eliteArmorEffectiveness, double eliteRegenMultiplier, double pvpDamageMultiplier, double selfDamageMultiplier,
@@ -131,6 +142,34 @@ public record PdConfig(
 		public static final EliteAlert DEFAULTS = new EliteAlert(true, 64, 2, 60);
 	}
 
+	/** Bounds of the Elite skeleton settings (1.4.0, Phase 6). */
+	public static final double MAX_ARROW_SPEED_MULTIPLIER = 3.0;
+	public static final double MIN_ARROW_DAMAGE_MULTIPLIER = 0.1;
+	public static final double MAX_ARROW_DAMAGE_MULTIPLIER = 3.0;
+	/** Vanilla skeletons shoot from 15 blocks; the Elite range never goes below that. */
+	public static final int VANILLA_BOW_RANGE = 15;
+	public static final int MAX_BOW_RANGE = 48;
+	/** The countdown after a shot; vanilla is 40 (20 on Hard). A shot also needs vanilla's fixed 20-tick draw. */
+	public static final int MIN_FIRING_INTERVAL_TICKS = 10;
+	public static final int MAX_FIRING_INTERVAL_TICKS = 60;
+
+	/**
+	 * Elite skeletons (1.4.0, Phase 6, plan 6.4): applied to a skeleton-family shot only while its target is an Elite player.
+	 * Speed and damage are separate controls with no compensation between them: vanilla arrow damage already grows with the
+	 * speed at impact, and what that does in practice is measured, not assumed.
+	 *
+	 * @param enabled master switch for everything below
+	 * @param arrowSpeedMultiplier launch speed relative to vanilla's 1.6
+	 * @param arrowDamageMultiplier scale on the arrow's base damage (vanilla's speed-at-impact rule still applies on top)
+	 * @param predictionStrength 0 = vanilla aim, 1 = aim fully at where the player will be (from their movement)
+	 * @param maxRange blocks within which the skeleton starts shooting (vanilla 15)
+	 * @param firingIntervalTicks the countdown after a shot (vanilla 40, Hard 20); the 20-tick draw is never shortened
+	 */
+	public record EliteSkeleton(boolean enabled, double arrowSpeedMultiplier, double arrowDamageMultiplier, double predictionStrength,
+		int maxRange, int firingIntervalTicks) {
+		public static final EliteSkeleton DEFAULTS = new EliteSkeleton(true, 1.5, 1.0, 1.0, 24, 10);
+	}
+
 	/** One attacker family's effect: probability per successful hit and base duration. */
 	public record MobEffectSetting(double chance, int seconds) {
 	}
@@ -174,7 +213,8 @@ public record PdConfig(
 			new EliteHunt(true, 10, 8),
 			new EliteEffects(true, 30, new MobEffectSetting(0.35, 8), new MobEffectSetting(0.35, 5), new MobEffectSetting(0.50, 6),
 				new MobEffectSetting(0.25, 4), new MobEffectSetting(0.30, 3)),
-			EliteAlert.DEFAULTS
+			EliteAlert.DEFAULTS,
+			EliteSkeleton.DEFAULTS
 		);
 	}
 }

@@ -292,10 +292,37 @@ public final class PdHooks {
 	/** Skeleton-family bow cadence against an Elite target: the vanilla Hard interval. */
 	public static int bowInterval(Mob mob, int vanilla) {
 		PdConfig.EliteAi ai = eliteAiFor(mob.getTarget());
-		if (ai == null || !ai.advancedCombat() || !(mob instanceof AbstractSkeleton skeleton)) {
+		if (ai == null || !(mob instanceof AbstractSkeleton skeleton)) {
+			return vanilla;
+		}
+		PdConfig.EliteSkeleton sk = PdRuntime.get().config().eliteSkeleton();
+		if (sk.enabled()) {
+			// 1.4.0: the Elite skeleton firing interval (never slower than vanilla's own)
+			return Math.min(vanilla, sk.firingIntervalTicks());
+		}
+		if (!ai.advancedCombat()) {
 			return vanilla;
 		}
 		return EliteSurvival.bowInterval(vanilla, ((AbstractSkeletonAccess) skeleton).personaldifficulty$hardAttackInterval());
+	}
+
+	/** The Elite skeleton settings if {@code target} is an Elite player and they are switched on, else null. */
+	public static PdConfig.@Nullable EliteSkeleton eliteSkeletonFor(@Nullable Entity target) {
+		if (eliteAiFor(target) == null) {
+			return null;
+		}
+		PdConfig.EliteSkeleton sk = PdRuntime.get().config().eliteSkeleton();
+		return sk.enabled() ? sk : null;
+	}
+
+	/** {@code RangedBowAttackGoal}'s squared shooting range for a skeleton aiming at {@code target} (vanilla 15 blocks). */
+	public static float bowRangeSqr(Mob mob, float vanilla) {
+		PdConfig.EliteSkeleton sk = mob instanceof AbstractSkeleton ? eliteSkeletonFor(mob.getTarget()) : null;
+		if (sk == null) {
+			return vanilla;
+		}
+		float elite = (float) sk.maxRange() * sk.maxRange();
+		return Math.max(vanilla, elite);
 	}
 
 	/**

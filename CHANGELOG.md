@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased: Phase 6 of the 1.4.0 line (Batch A: individual mobs), in progress
+
+### Added so far
+* **Elite skeletons** (plan 6.4; skeletons, strays, bogged; only while the target is an Elite player): arrow speed 1.5x
+  (`elite.skeleton.arrow-speed-multiplier`), a separate base-damage scale (`arrow-damage-multiplier`, default 1.0, no automatic
+  compensation for speed), predictive aim (`prediction-strength`, default 1.0: solves the arc with vanilla arrow physics and
+  leads the player's movement), shooting range 24 blocks (`max-range`, vanilla 15) and a 10-tick firing countdown
+  (`firing-interval-ticks`; vanilla 40, Hard 20; the 20-tick draw is unchanged). `elite.skeleton.enabled=false` restores the
+  1.3.0 behaviour. All on the "Elite hunting and effects" settings page.
+
+### Tests so far
+* Unit: the aim solver hits a stationary target at 4 to 32 blocks for launch speeds 1.6 to 4.8, shows that vanilla's arc
+  allowance overshoots at 1.5x speed, leads a target moving sideways at sprint speed, blends by strength and falls back to vanilla
+  aim out of reach, at point blank and on garbage input.
+* GameTests: direct shots (Elite arrows at 2.4 against vanilla's 1.6, same base damage, a moving Elite player is led, a Normal
+  player never is); live AI (an Elite player is shot at from 20 blocks without the skeleton walking in; at 10 blocks the Elite
+  skeleton shoots clearly more often); an opt-in damage measurement at 8, 16 and 24 blocks for speeds 1.0x, 1.5x and 2.0x. The
+  1.3.0 skeleton tests run with the module off (`elite_13_ai` environment).
+
 ## 1.3.1-rc.4: UNPUBLISHED development checkpoint (Phase 5 of the 1.4.0 line: Elite hunting core)
 
 > **Status: a private checkpoint, NOT published.** Builds on `1.3.1-rc.3`.

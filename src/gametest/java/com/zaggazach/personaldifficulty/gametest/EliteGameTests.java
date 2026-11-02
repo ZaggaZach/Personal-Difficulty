@@ -321,7 +321,7 @@ public class EliteGameTests {
 		Sample eliteS = sample(level, skeleton, n, () -> skeleton.performRangedAttack(elite, 1.0F));
 		Sample normalS = sample(level, skeleton, n, () -> skeleton.performRangedAttack(normal, 1.0F));
 		Sample mobS = sample(level, skeleton, n, () -> skeleton.performRangedAttack(decoy, 1.0F));
-		expectTighter("skeleton", eliteS, normalS, mobS, vanilla, 1.0);
+		expectTighter("skeleton", eliteS, normalS, mobS, vanilla, 1.0, eliteSkeletonSpeedRatio());
 		// target-specific: every other personal difficulty is shot at exactly like a non-player (Easy is widened, tested elsewhere)
 		for (var other : List.of(hard, peaceful)) {
 			Sample s = sample(level, skeleton, n, () -> skeleton.performRangedAttack(other, 1.0F));
@@ -356,7 +356,7 @@ public class EliteGameTests {
 		stray.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
 		expectTighter("stray", sample(level, stray, n, () -> stray.performRangedAttack(elite, 1.0F)),
 			sample(level, stray, n, () -> stray.performRangedAttack(normal, 1.0F)),
-			sample(level, stray, n, () -> stray.performRangedAttack(decoy, 1.0F)), vanilla, 1.0);
+			sample(level, stray, n, () -> stray.performRangedAttack(decoy, 1.0F)), vanilla, 1.0, eliteSkeletonSpeedRatio());
 
 		Illusioner illusioner = h.spawnWithNoFreeWill(EntityTypes.ILLUSIONER, 2, 1, 2);
 		illusioner.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
@@ -508,7 +508,7 @@ public class EliteGameTests {
 			Sample e = sample(level, skeleton, 800, () -> skeleton.performRangedAttack(elite, 1.0F));
 			Sample n = sample(level, skeleton, 800, () -> skeleton.performRangedAttack(normal, 1.0F));
 			Sample d = sample(level, skeleton, 800, () -> skeleton.performRangedAttack(decoy, 1.0F));
-			expectTighter("skeleton in a HARD world", e, n, d, 2.0, 1.0); // 1 vs 2: still half the spread
+			expectTighter("skeleton in a HARD world", e, n, d, 2.0, 1.0, eliteSkeletonSpeedRatio()); // 1 vs 2: still half the spread
 			Sample z = sample(level, skeleton, 800, () -> skeleton.performRangedAttack(easy, 1.0F));
 			expectWider("skeleton in a HARD world (easy player)", z, n, d, 2.0); // 14 vs 2
 		});
