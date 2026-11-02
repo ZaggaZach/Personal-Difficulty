@@ -7,7 +7,8 @@
 > **Phase 6 build: PASSED (2 November 2026).** `./gradlew build` green: unit tests and all 181 required GameTests. Measured in
 > that run: creeper fuse 20 ticks against an Elite player, 30 against a Normal one; a zombie broke an Elite player's door at tick
 > 568 in a Normal world and left the Normal player's door intact; pillagers fired every 33 ticks at an Elite player against 62.
-> **In-game test: pending.** Spiders, drowned and vindicators were not given extra behaviour (decided: they keep the Elite hunting,
+> **In-game test: PASSED (2 November 2026)** on the real server: faster, leading, longer-range skeletons; Enderman Blindside;
+> faster pillagers; the optional creeper fuse and zombie door-breaking. Spiders, drowned and vindicators were not given extra behaviour (decided: they keep the Elite hunting,
 > range, alerts and effects only).
 
 ### Added
