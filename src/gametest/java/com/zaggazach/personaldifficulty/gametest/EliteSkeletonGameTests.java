@@ -85,7 +85,7 @@ public class EliteSkeletonGameTests {
 	// ------------------------------------------------------------------ live AI: range and firing rate
 
 	/** The arrows {@code shooter} has fired so far (by UUID), and the shooter-to-target distance when each one appeared. */
-	private static void collectShots(ServerLevel level, Arena a, Mob shooter, Mob target, Set<UUID> seen, List<Double> distances) {
+	private static void collectShots(ServerLevel level, Arena a, Mob shooter, net.minecraft.world.entity.Entity target, Set<UUID> seen, List<Double> distances) {
 		AABB box = new AABB(a.x0 - 4, a.y - 2, a.z0 - 4, a.x0 + 124, a.y + 30, a.z0 + 104);
 		for (AbstractArrow arrow : level.getEntitiesOfClass(AbstractArrow.class, box, x -> x.getOwner() == shooter)) {
 			if (seen.add(arrow.getUUID())) {
