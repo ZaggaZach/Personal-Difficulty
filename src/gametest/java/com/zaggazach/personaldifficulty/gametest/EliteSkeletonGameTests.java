@@ -157,11 +157,16 @@ public class EliteSkeletonGameTests {
 	/**
 	 * Plan section 9: the damage that Elite skeleton arrows actually deal, at fixed distances, for arrow speeds 1.0x, 1.5x and 2.0x
 	 * (damage multiplier 1.0). Stationary Elite players (Elite takes 2x, no armour), one skeleton each at 8, 16 and 24 blocks, a
-	 * shot every 20 ticks (more than the 10 invulnerability ticks), health restored after each hit. Not required: it reports
+	 * shot every 20 ticks (more than the 10 invulnerability ticks), health restored after each hit. Opt-in ({@code -PpdPerf=true})
+	 * and not required: it reports
 	 * numbers for the README and for any decision on {@code arrow-damage-multiplier}.
 	 */
 	@GameTest(environment = MEASURE, maxTicks = 3 * 21 * 20 + 200, required = false)
 	public void measure_skeletonArrowDamageAtDistance_forSeveralArrowSpeeds(GameTestHelper h) {
+		if (!Boolean.getBoolean("pd.perf")) {
+			h.succeed(); // opt-in, with the performance measurements: ./gradlew build -PpdPerf=true
+			return;
+		}
 		ServerLevel level = h.getLevel();
 		Arena a = new Arena(h, 106);
 		double[] distances = {8, 16, 24};
