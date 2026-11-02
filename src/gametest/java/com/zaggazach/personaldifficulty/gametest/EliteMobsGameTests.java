@@ -189,7 +189,7 @@ public class EliteMobsGameTests {
 		});
 		at(h, 960, () -> {
 			String report = String.format(Locale.ROOT, "ZOMBIE-DOOR world %s: Elite room door broken at tick %d, Normal room door broken at tick %d (-1 = intact); zombies ended %.1f and %.1f blocks from the door",
-				level.getDifficulty(), brokenAt[0], brokenAt[1], Math.sqrt(zombies[0].distanceToSqr(doors[0].getCenter())), Math.sqrt(zombies[1].distanceToSqr(doors[1].getCenter())));
+				level.getDifficulty(), brokenAt[0], brokenAt[1], Math.sqrt(zombies[0].distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(doors[0]))), Math.sqrt(zombies[1].distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(doors[1]))));
 			System.out.println(report);
 			check(level.getDifficulty() != net.minecraft.world.Difficulty.HARD, "premise: not a Hard world (where vanilla zombies may break doors anyway): " + report);
 			check(brokenAt[0] > 0, "the zombie broke the door to reach the Elite player: " + report);
