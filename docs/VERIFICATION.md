@@ -455,3 +455,32 @@ no bundled Loader/Fabric API/Gson. The mod source contains no call that sets the
    get a clear error trying to return; `/personaldifficulty admin enable all` restores it without a restart.
 5. Restart the server and confirm choices and the availability policy persisted; `/difficulty` must still show your world difficulty.
 6. Upgrading a 1.0.0 world: keep `world/personaldifficulty/players.json`; former `inherit` players appear as Normal.
+
+## 1.4.0 Phase 6: Elite skeleton measurements (2 November 2026, 26.3, Normal world)
+
+Measured by `EliteSkeletonGameTests` on a 16-thread Windows 11 desktop (Java 25).
+
+**Direct shots** (200 shots each, player 15 blocks away, level with the skeleton):
+
+| | Launch speed | Base damage | Mean aim (sideways component) |
+|---|---|---|---|
+| Elite player, standing | 2.401 (1.5x) | 2.227 | -0.0007 |
+| Elite player, moving sideways 0.25 blocks/tick | 2.401 | 2.227 | +0.1075 (led) |
+| Normal player, moving the same way | 1.606 (vanilla) | 2.231 | +0.0020 (never led) |
+
+The Elite shot's pitch was -0.013 against vanilla's +0.135: vanilla's fixed arc allowance would overshoot at 1.5x speed.
+
+**Live AI** (495 ticks, players cannot be hurt): an Elite player 20 blocks away was shot at 16 times; at 10 blocks the Elite
+skeleton shot every 31 ticks against every 62 ticks for a Normal player (the predicted ~30 against ~60).
+
+**Damage per hit** to a stationary Elite player (Elite takes 2x, no armour), 20 shots per cell, every shot hit:
+
+| Arrow speed | 8 blocks | 16 blocks | 24 blocks |
+|---|---|---|---|
+| 1.0x (vanilla) | 8.00 (sd 0.89) | 7.50 (sd 0.87) | 7.30 (sd 0.95) |
+| 1.5x (default) | 11.20 (sd 1.33) | 11.10 (sd 1.18) | 10.70 (sd 1.45) |
+| 2.0x | 14.50 (sd 1.88) | 14.50 (sd 1.40) | 14.40 (sd 1.02) |
+
+In plain terms: vanilla arrow damage follows the arrow's speed when it hits, so 1.5x arrows deal about 45% more damage per hit at
+every tested distance, and 2.0x arrows about 90% more, with `arrow-damage-multiplier` at 1.0. Nothing compensates for this
+automatically (plan 6.4); `arrow-damage-multiplier` is the separate control for it.

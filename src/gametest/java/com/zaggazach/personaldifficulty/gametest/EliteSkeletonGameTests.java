@@ -135,14 +135,17 @@ public class EliteSkeletonGameTests {
 		at(h, 500, () -> {
 			int farShots = shotAt.get(0).size();
 			double farMin = shotAt.get(0).stream().mapToDouble(Double::doubleValue).min().orElse(-1);
+			double farFirst = shotAt.get(0).isEmpty() ? -1 : shotAt.get(0).get(0);
 			int eliteShots = shotAt.get(1).size();
 			int normalShots = shotAt.get(2).size();
 			String report = String.format(Locale.ROOT,
-				"SKELETON-LIVE world %s | Elite at 20 blocks: %d shots, closest shot from %.1f blocks | at 10 blocks over 495 ticks: Elite %d shots (every %.0f ticks), Normal %d shots (every %.0f ticks)",
-				level.getDifficulty(), farShots, farMin, eliteShots, eliteShots == 0 ? 0.0 : 495.0 / eliteShots, normalShots, normalShots == 0 ? 0.0 : 495.0 / normalShots);
+				"SKELETON-LIVE world %s | Elite at 20 blocks: %d shots, first from %.1f blocks, closest from %.1f blocks | at 10 blocks over 495 ticks: Elite %d shots (every %.0f ticks), Normal %d shots (every %.0f ticks)",
+				level.getDifficulty(), farShots, farFirst, farMin, eliteShots, eliteShots == 0 ? 0.0 : 495.0 / eliteShots, normalShots, normalShots == 0 ? 0.0 : 495.0 / normalShots);
 			System.out.println(report);
 			check(farShots >= 3, "an Elite player 20 blocks away is shot at: " + report);
-			check(farMin > 16.0, "from beyond vanilla's 15-block range (the skeleton did not have to walk in): " + report);
+			// the first shot comes from where it stands; afterwards it strafes as vanilla does, scaled to the Elite range (forward while
+			// beyond 75% of the squared range, about 21 blocks, backwards inside 25%, 12 blocks), so later shots come from 12-21 blocks
+			check(farFirst > 16.0, "the first shot comes from beyond vanilla's 15-block range (the skeleton did not have to walk in): " + report);
 			check(normalShots >= 3, "premise: the Normal skeleton shoots at 10 blocks: " + report);
 			check(eliteShots >= normalShots * 1.2, "the Elite skeleton shoots clearly more often (cycle about 30 ticks against 60, or 40 in a Hard world): " + report);
 			for (Arena a : arenas) {
