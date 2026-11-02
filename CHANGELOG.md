@@ -9,6 +9,10 @@
   leads the player's movement), shooting range 24 blocks (`max-range`, vanilla 15) and a 10-tick firing countdown
   (`firing-interval-ticks`; vanilla 40, Hard 20; the 20-tick draw is unchanged). `elite.skeleton.enabled=false` restores the
   1.3.0 behaviour. All on the "Elite hunting and effects" settings page.
+* **Measured and decided (2 November 2026):** at the default 1.5x speed, Elite skeleton arrows hit about 45% harder (about 11
+  health points per hit on an unarmoured Elite player instead of about 7.6, at 8 to 24 blocks; 2.0x: about 90% harder), because
+  vanilla arrow damage follows the speed at impact. Decision: keep `arrow-damage-multiplier` at 1.0, so the harder hits are part
+  of Elite. Numbers in `docs/VERIFICATION.md`.
 
 ### Tests so far
 * Unit: the aim solver hits a stationary target at 4 to 32 blocks for launch speeds 1.6 to 4.8, shows that vanilla's arc

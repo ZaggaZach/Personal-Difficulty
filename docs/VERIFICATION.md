@@ -484,3 +484,5 @@ skeleton shot every 31 ticks against every 62 ticks for a Normal player (the pre
 In plain terms: vanilla arrow damage follows the arrow's speed when it hits, so 1.5x arrows deal about 45% more damage per hit at
 every tested distance, and 2.0x arrows about 90% more, with `arrow-damage-multiplier` at 1.0. Nothing compensates for this
 automatically (plan 6.4); `arrow-damage-multiplier` is the separate control for it.
+
+Decision (2 November 2026): `arrow-damage-multiplier` stays at 1.0; the harder hits from faster arrows are intended for Elite.
