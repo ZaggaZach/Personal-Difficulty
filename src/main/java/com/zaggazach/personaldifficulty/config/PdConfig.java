@@ -25,8 +25,19 @@ public record PdConfig(
 	EliteEffects eliteEffects,
 	EliteAlert eliteAlert,
 	EliteSkeleton eliteSkeleton,
-	EliteEnderman eliteEnderman
+	EliteEnderman eliteEnderman,
+	EliteMobs eliteMobs
 ) {
+	/** The form used before the per-mob Elite settings existed (zombie doors, creeper fuse, pillager crossbow); those are the defaults. */
+	public PdConfig(Profile easy, Profile hard, Profile elite, double easyRangedMinUncertainty, double eliteRangedMaxUncertainty,
+		double eliteArmorEffectiveness, double eliteRegenMultiplier, double pvpDamageMultiplier, double selfDamageMultiplier,
+		boolean environmentalApplyProfile, boolean voidApplyProfile, boolean adminApplyProfile, RangedMobs rangedMobs, EliteAi eliteAi,
+		EliteHunt eliteHunt, EliteEffects eliteEffects, EliteAlert eliteAlert, EliteSkeleton eliteSkeleton, EliteEnderman eliteEnderman) {
+		this(easy, hard, elite, easyRangedMinUncertainty, eliteRangedMaxUncertainty, eliteArmorEffectiveness, eliteRegenMultiplier,
+			pvpDamageMultiplier, selfDamageMultiplier, environmentalApplyProfile, voidApplyProfile, adminApplyProfile, rangedMobs, eliteAi,
+			eliteHunt, eliteEffects, eliteAlert, eliteSkeleton, eliteEnderman, EliteMobs.DEFAULTS);
+	}
+
 	/** The form used before the Enderman Blindside settings existed; those settings are the defaults. */
 	public PdConfig(Profile easy, Profile hard, Profile elite, double easyRangedMinUncertainty, double eliteRangedMaxUncertainty,
 		double eliteArmorEffectiveness, double eliteRegenMultiplier, double pvpDamageMultiplier, double selfDamageMultiplier,
@@ -197,6 +208,27 @@ public record PdConfig(
 		public static final EliteEnderman DEFAULTS = new EliteEnderman(true, 0.5, 3);
 	}
 
+	/** Bounds of the creeper fuse against Elite players, in ticks (vanilla 30 = 1.5 s); never below 15 (0.75 s). */
+	public static final int MIN_CREEPER_FUSE_TICKS = 15;
+	public static final int VANILLA_CREEPER_FUSE_TICKS = 30;
+	/** Bounds of the pillager's wait after charging, in ticks (vanilla 20 to 39). */
+	public static final int MAX_CROSSBOW_DELAY_TICKS = 40;
+
+	/**
+	 * Per-mob Elite behaviour (1.4.0, Phase 6, plan 6.6), each only while the mob's target is an Elite player.
+	 *
+	 * @param zombieBreakDoors zombies (and husks, zombie villagers) break wooden doors on any world difficulty (vanilla: Hard only)
+	 * @param creeperShortFuse creepers explode after {@code creeperFuseTicks} instead of vanilla's 30
+	 * @param creeperFuseTicks the shortened fuse
+	 * @param pillagerFastCrossbow pillagers fire sooner after charging their crossbow
+	 * @param pillagerAttackDelayTicks the wait after charging (vanilla 20 to 39 ticks); the charge itself is unchanged
+	 */
+	public record EliteMobs(boolean zombieBreakDoors, boolean creeperShortFuse, int creeperFuseTicks, boolean pillagerFastCrossbow,
+		int pillagerAttackDelayTicks) {
+		/** Door-breaking and the creeper fuse ship OFF (plan C2); the pillager change ships on. */
+		public static final EliteMobs DEFAULTS = new EliteMobs(false, false, 20, true, 5);
+	}
+
 	/** One attacker family's effect: probability per successful hit and base duration. */
 	public record MobEffectSetting(double chance, int seconds) {
 	}
@@ -242,7 +274,8 @@ public record PdConfig(
 				new MobEffectSetting(0.25, 4), new MobEffectSetting(0.30, 3)),
 			EliteAlert.DEFAULTS,
 			EliteSkeleton.DEFAULTS,
-			EliteEnderman.DEFAULTS
+			EliteEnderman.DEFAULTS,
+			EliteMobs.DEFAULTS
 		);
 	}
 }

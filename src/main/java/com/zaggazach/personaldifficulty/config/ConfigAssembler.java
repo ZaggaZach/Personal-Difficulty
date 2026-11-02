@@ -45,7 +45,10 @@ public final class ConfigAssembler {
 				b(values, "elite.skeleton.enabled"), d(values, "elite.skeleton.arrow-speed-multiplier"), d(values, "elite.skeleton.arrow-damage-multiplier"),
 				d(values, "elite.skeleton.prediction-strength"), i(values, "elite.skeleton.max-range"), i(values, "elite.skeleton.firing-interval-ticks")),
 			new PdConfig.EliteEnderman(
-				b(values, "elite.enderman.blindside-enabled"), d(values, "elite.enderman.blindside-chance"), i(values, "elite.enderman.blindside-distance"))
+				b(values, "elite.enderman.blindside-enabled"), d(values, "elite.enderman.blindside-chance"), i(values, "elite.enderman.blindside-distance")),
+			new PdConfig.EliteMobs(
+				b(values, "elite.zombie.break-doors"), b(values, "elite.creeper.short-fuse"), i(values, "elite.creeper.fuse-ticks"),
+				b(values, "elite.pillager.fast-crossbow"), i(values, "elite.pillager.attack-delay-ticks"))
 		);
 	}
 

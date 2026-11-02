@@ -129,6 +129,13 @@ public final class SettingRegistry {
 		e.add(flag(o += 10, "elite.enderman.blindside-enabled", en.enabled(), "Elite endermen: Blindside", live, "eliteEnderman.enabled", c -> c.eliteEnderman().enabled()));
 		e.add(num(o += 10, "elite.enderman.blindside-chance", 0, 1, en.chance(), 0.05, "Elite endermen: Blindside chance", live, "eliteEnderman.chance", c -> c.eliteEnderman().chance()));
 		e.add(whole(o += 10, "elite.enderman.blindside-distance", PdConfig.MIN_BLINDSIDE_DISTANCE, PdConfig.MAX_BLINDSIDE_DISTANCE, en.distance(), "Elite endermen: Blindside distance (blocks)", live, "eliteEnderman.distance", c -> c.eliteEnderman().distance()));
+		// Per-mob Elite behaviour (1.4.0, Phase 6)
+		PdConfig.EliteMobs mobs = PdConfig.EliteMobs.DEFAULTS;
+		e.add(flag(o += 10, "elite.zombie.break-doors", mobs.zombieBreakDoors(), "Elite zombies: break doors on any difficulty", live, "eliteMobs.zombieBreakDoors", c -> c.eliteMobs().zombieBreakDoors()));
+		e.add(flag(o += 10, "elite.creeper.short-fuse", mobs.creeperShortFuse(), "Elite creepers: shorter fuse", live, "eliteMobs.creeperShortFuse", c -> c.eliteMobs().creeperShortFuse()));
+		e.add(whole(o += 10, "elite.creeper.fuse-ticks", PdConfig.MIN_CREEPER_FUSE_TICKS, PdConfig.VANILLA_CREEPER_FUSE_TICKS, mobs.creeperFuseTicks(), "Elite creepers: fuse (ticks)", live, "eliteMobs.creeperFuseTicks", c -> c.eliteMobs().creeperFuseTicks()));
+		e.add(flag(o += 10, "elite.pillager.fast-crossbow", mobs.pillagerFastCrossbow(), "Elite pillagers: fire sooner", live, "eliteMobs.pillagerFastCrossbow", c -> c.eliteMobs().pillagerFastCrossbow()));
+		e.add(whole(o += 10, "elite.pillager.attack-delay-ticks", 1, PdConfig.MAX_CROSSBOW_DELAY_TICKS, mobs.pillagerAttackDelayTicks(), "Elite pillagers: wait after charging (ticks)", live, "eliteMobs.pillagerAttackDelayTicks", c -> c.eliteMobs().pillagerAttackDelayTicks()));
 		// Elite mob effects
 		e.add(flag(o += 10, "elite.effects.enabled", true, "Elite effects: enabled", live, "eliteEffects.enabled", c -> c.eliteEffects().enabled()));
 		e.add(whole(o += 10, "elite.effects.max-duration-seconds", 1, PdConfig.MAX_EFFECT_SECONDS, 30, "Elite effects: maximum duration (seconds)", live, "eliteEffects.maxDurationSeconds", c -> c.eliteEffects().maxDurationSeconds()));

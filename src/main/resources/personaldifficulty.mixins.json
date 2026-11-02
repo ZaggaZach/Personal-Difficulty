@@ -3,10 +3,12 @@
 	"package": "com.zaggazach.personaldifficulty.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"mixins": [
-		"AbstractSkeletonAccess",
 		"AbstractArrowAccess",
+		"AbstractSkeletonAccess",
 		"AbstractSkeletonAimMixin",
 		"AbstractSkeletonShotMixin",
+		"BreakDoorGoalMixin",
+		"CreeperFuseMixin",
 		"CrossbowAimMixin",
 		"DrownedAimMixin",
 		"EnderDragonTargetMixin",
@@ -25,6 +27,7 @@
 		"PiglinAimMixin",
 		"PlayerExhaustionMixin",
 		"RangedBowAttackGoalMixin",
+		"RangedCrossbowAttackGoalMixin",
 		"TargetGoalMixin",
 		"WardenTargetMixin",
 		"WitchAimMixin"

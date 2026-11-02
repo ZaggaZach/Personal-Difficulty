@@ -23,6 +23,8 @@ import net.minecraft.world.entity.ai.targeting.TargetingConditions;
 import net.minecraft.world.entity.monster.Enderman;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.entity.monster.spider.Spider;
+import net.minecraft.world.entity.monster.zombie.Drowned;
+import net.minecraft.world.entity.monster.zombie.Zombie;
 import net.minecraft.world.entity.monster.zombie.ZombifiedPiglin;
 import net.minecraft.world.level.PathNavigationRegion;
 import net.minecraft.world.level.pathfinder.Path;
@@ -117,6 +119,7 @@ public final class PdHunt {
 		}
 		LivingEntity current = mob.getTarget();
 		HuntingMob memory = (HuntingMob) mob;
+		updateDoorRoutes(rt, mob, current);
 		// A target that this class assigned has no vanilla goal watching over it, so the rules such a goal would enforce are
 		// enforced here: gone when dead, out of pursuit range, or unseen for longer than the (Elite-extended) memory.
 		if (current != null && current.getUUID().equals(memory.personaldifficulty$ownedTarget())) {
@@ -168,6 +171,26 @@ public final class PdHunt {
 			memory.personaldifficulty$setUnseenTicks(0);
 			memory.personaldifficulty$setStall(0, 0);
 		}
+	}
+
+	// ------------------------------------------------------------------ zombies breaking doors (Phase 6)
+
+	/** Zombie-family mobs that get the Elite door-breaking goal: ground walkers, not drowned (vanilla never lets them) or zombified piglins. */
+	public static boolean breaksDoorsForElite(Mob mob) {
+		return mob instanceof Zombie && !(mob instanceof Drowned) && !(mob instanceof ZombifiedPiglin) && mob.getNavigation().canNavigateGround();
+	}
+
+	/**
+	 * A zombie routes through doors only if its navigation may "open" them (vanilla turns that on only for zombies that can break
+	 * doors). While it hunts an Elite player with {@code elite.zombie.break-doors} on, it may; otherwise it is back to vanilla's
+	 * own state. Checked on the scan tick.
+	 */
+	private static void updateDoorRoutes(PdRuntime rt, Mob mob, @Nullable LivingEntity target) {
+		if (!(mob instanceof Zombie zombie) || !breaksDoorsForElite(mob)) {
+			return;
+		}
+		boolean elite = rt.config().eliteMobs().zombieBreakDoors() && isLiveEliteTarget(rt, target) && !gaveUpOn(mob, target);
+		mob.getNavigation().setCanOpenDoors(elite || zombie.canBreakDoors());
 	}
 
 	// ------------------------------------------------------------------ giving up on an unreachable Elite player (PursuitStall)

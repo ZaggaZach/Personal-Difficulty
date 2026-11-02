@@ -1,0 +1,5 @@
+{
+	"type": "minecraft:function",
+	"setup": "personaldifficulty-gametest:mobs_on",
+	"teardown": "personaldifficulty-gametest:mobs_off"
+}

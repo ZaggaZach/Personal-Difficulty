@@ -11,6 +11,7 @@ import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.entity.ai.goal.BreakDoorGoal;
 import net.minecraft.world.entity.ai.goal.GoalSelector;
 import net.minecraft.world.entity.ai.goal.WrappedGoal;
 import org.jspecify.annotations.Nullable;
@@ -68,6 +69,12 @@ abstract class MobHuntMixin implements HuntingMob {
 	private void personaldifficulty$addLastKnownGoal(EntityType<? extends Mob> type, Level level, CallbackInfo ci) {
 		if (level instanceof ServerLevel && (Object) this instanceof PathfinderMob mob && (Object) this instanceof Monster) {
 			this.goalSelector.addGoal(PdLastKnownGoal.priorityFor(mob), new PdLastKnownGoal(mob));
+			// Phase 6: a door-breaking goal that never passes its own difficulty check; the BreakDoorGoal hook lets it run only
+			// while the zombie hunts an Elite player with elite.zombie.break-doors on (vanilla's own goal, when a zombie has one,
+			// is the same class and follows the same rule)
+			if (PdHunt.breaksDoorsForElite(mob)) {
+				this.goalSelector.addGoal(1, new BreakDoorGoal(mob, difficulty -> false));
+			}
 		}
 	}
 

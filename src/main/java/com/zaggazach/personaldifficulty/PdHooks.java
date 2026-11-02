@@ -306,6 +306,33 @@ public final class PdHooks {
 		return EliteSurvival.bowInterval(vanilla, ((AbstractSkeletonAccess) skeleton).personaldifficulty$hardAttackInterval());
 	}
 
+	/** The per-mob Elite settings if {@code mob}'s target is an Elite player, else null. */
+	private static PdConfig.@Nullable EliteMobs eliteMobsFor(Mob mob) {
+		return eliteAiFor(mob.getTarget()) == null ? null : PdRuntime.get().config().eliteMobs();
+	}
+
+	/** A zombie-family door-breaking goal may run on any world difficulty while its mob hunts an Elite player (setting). */
+	public static boolean breakDoorDifficulty(Mob mob, boolean vanilla) {
+		if (vanilla) {
+			return true;
+		}
+		PdConfig.EliteMobs m = eliteMobsFor(mob);
+		return m != null && m.zombieBreakDoors() && !PdHunt.gaveUpOn(mob, mob.getTarget());
+	}
+
+	/** The creeper's fuse length (ticks) while it hunts {@code creeper}'s target (vanilla 30). */
+	public static int creeperFuse(Mob creeper, int vanilla) {
+		PdConfig.EliteMobs m = eliteMobsFor(creeper);
+		return m == null || !m.creeperShortFuse() ? vanilla : Math.min(vanilla, Math.max(PdConfig.MIN_CREEPER_FUSE_TICKS, m.creeperFuseTicks()));
+	}
+
+	/** The pillager's wait (ticks) after charging its crossbow, vanilla 20 to 39. */
+	public static int crossbowDelay(Mob pillager, int vanilla) {
+		PdConfig.EliteMobs m = eliteMobsFor(pillager);
+		// never below 1: vanilla counts the wait down and fires when it reaches exactly 0
+		return m == null || !m.pillagerFastCrossbow() ? vanilla : Math.min(vanilla, Math.max(1, m.pillagerAttackDelayTicks()));
+	}
+
 	/** The Elite skeleton settings if {@code target} is an Elite player and they are switched on, else null. */
 	public static PdConfig.@Nullable EliteSkeleton eliteSkeletonFor(@Nullable Entity target) {
 		if (eliteAiFor(target) == null) {

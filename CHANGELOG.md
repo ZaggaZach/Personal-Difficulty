@@ -20,7 +20,16 @@
   user), `blindside-distance` (3). Vanilla's own teleport checks still apply; if no safe spot exists, vanilla's teleport happens.
   Nothing makes an Enderman angry that vanilla would not; the daylight teleport and staring are untouched.
 
+* **Other Elite mobs** (plan 6.6, chosen by the user), each only while the mob hunts an Elite player:
+  zombies, husks and zombie villagers break wooden doors on any world difficulty (`elite.zombie.break-doors`, **off** by
+  default; vanilla only on Hard); creepers explode after `elite.creeper.fuse-ticks` (20, never below 15) instead of 30
+  (`elite.creeper.short-fuse`, **off** by default); pillagers fire `elite.pillager.attack-delay-ticks` (5) after charging instead
+  of 20 to 39 (`elite.pillager.fast-crossbow`, on).
+
 ### Tests so far
+* GameTests (other mobs): an Elite pillager fires clearly more often than a Normal one; a creeper's fuse is about 20 ticks against
+  an Elite player and vanilla's 30 against a Normal one; a zombie breaks the door of a room holding an Elite player in a Normal
+  world and leaves a Normal player's door alone (the last two in their own environment, `elite_mobs_on`).
 * Unit (Blindside): every candidate spot is behind the player for every look direction, Minecraft's yaw convention, bounded
   distance and jitter.
 * GameTest (Blindside): 60 trials each of vanilla's "close the distance" teleport and the arrow dodge, against an Elite and a

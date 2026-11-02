@@ -210,6 +210,17 @@ The spot needs solid ground, three blocks of headroom and no fluid, and vanilla'
 works, vanilla's teleport happens instead. Nothing makes an Enderman angry that vanilla would not, and its daylight teleport and
 reaction to being stared at are unchanged.
 
+#### Other Elite mobs (1.4.0)
+Each applies only while the mob is hunting an **Elite** player.
+
+| Setting | Default | Effect |
+|---|---|---|
+| `elite.zombie.break-doors` | **false** | Zombies, husks and zombie villagers break wooden doors on any world difficulty (vanilla: Hard only). Vanilla's break itself (about 12 s of hitting the door) is unchanged. |
+| `elite.creeper.short-fuse` | **false** | Creepers explode after `elite.creeper.fuse-ticks` instead of vanilla's 30 ticks (1.5 s). |
+| `elite.creeper.fuse-ticks` | **20** | The shortened fuse (15 .. 30 ticks). |
+| `elite.pillager.fast-crossbow` | **true** | Pillagers fire sooner after charging their crossbow. |
+| `elite.pillager.attack-delay-ticks` | **5** | Their wait after charging (1 .. 40 ticks; vanilla 20 to 39). The charge itself is unchanged. |
+
 #### Alert network and last-known-position search (1.4.0)
 A mob that **sees** an Elite player records where and when. Hostile mobs near it (`elite.alert.radius`, default 64 blocks) learn
 of that sighting, and may pass it on (`elite.alert.hops`, default 2). A mob with no target then walks to the **remembered point**
@@ -403,6 +414,11 @@ elite.skeleton.firing-interval-ticks=10        # 10 .. 60
 elite.enderman.blindside-enabled=true
 elite.enderman.blindside-chance=0.5            # 0 .. 1
 elite.enderman.blindside-distance=3            # 2 .. 6 blocks
+elite.zombie.break-doors=false
+elite.creeper.short-fuse=false
+elite.creeper.fuse-ticks=20                    # 15 .. 30
+elite.pillager.fast-crossbow=true
+elite.pillager.attack-delay-ticks=5            # 1 .. 40
 elite.effects.enabled=true
 elite.effects.max-duration-seconds=30         # 1 .. 60
 elite.effects.zombie-infection-chance=0.35    # per damaging hit, 0 .. 1
