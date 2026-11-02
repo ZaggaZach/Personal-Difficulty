@@ -24,8 +24,19 @@ public record PdConfig(
 	EliteHunt eliteHunt,
 	EliteEffects eliteEffects,
 	EliteAlert eliteAlert,
-	EliteSkeleton eliteSkeleton
+	EliteSkeleton eliteSkeleton,
+	EliteEnderman eliteEnderman
 ) {
+	/** The form used before the Enderman Blindside settings existed; those settings are the defaults. */
+	public PdConfig(Profile easy, Profile hard, Profile elite, double easyRangedMinUncertainty, double eliteRangedMaxUncertainty,
+		double eliteArmorEffectiveness, double eliteRegenMultiplier, double pvpDamageMultiplier, double selfDamageMultiplier,
+		boolean environmentalApplyProfile, boolean voidApplyProfile, boolean adminApplyProfile, RangedMobs rangedMobs, EliteAi eliteAi,
+		EliteHunt eliteHunt, EliteEffects eliteEffects, EliteAlert eliteAlert, EliteSkeleton eliteSkeleton) {
+		this(easy, hard, elite, easyRangedMinUncertainty, eliteRangedMaxUncertainty, eliteArmorEffectiveness, eliteRegenMultiplier,
+			pvpDamageMultiplier, selfDamageMultiplier, environmentalApplyProfile, voidApplyProfile, adminApplyProfile, rangedMobs, eliteAi,
+			eliteHunt, eliteEffects, eliteAlert, eliteSkeleton, EliteEnderman.DEFAULTS);
+	}
+
 	/** The form used before the Elite skeleton settings existed (Phase 5 and earlier); those settings are the defaults. */
 	public PdConfig(Profile easy, Profile hard, Profile elite, double easyRangedMinUncertainty, double eliteRangedMaxUncertainty,
 		double eliteArmorEffectiveness, double eliteRegenMultiplier, double pvpDamageMultiplier, double selfDamageMultiplier,
@@ -170,6 +181,22 @@ public record PdConfig(
 		public static final EliteSkeleton DEFAULTS = new EliteSkeleton(true, 1.5, 1.0, 1.0, 24, 10);
 	}
 
+	/** Bounds of {@code elite.enderman.blindside-distance}, in blocks behind the player. */
+	public static final int MIN_BLINDSIDE_DISTANCE = 2;
+	public static final int MAX_BLINDSIDE_DISTANCE = 6;
+
+	/**
+	 * Enderman Blindside (1.4.0, Phase 6, plan 6.5): an Enderman that is already angry at an Elite player (or was just hit by their
+	 * projectile) may land behind them instead of where vanilla would put it. Nothing makes an Enderman angry that vanilla would not.
+	 *
+	 * @param enabled master switch
+	 * @param chance probability that a qualifying teleport (closing the distance, or dodging a projectile) goes behind the player
+	 * @param distance blocks behind the player (plus or minus one, at random)
+	 */
+	public record EliteEnderman(boolean enabled, double chance, int distance) {
+		public static final EliteEnderman DEFAULTS = new EliteEnderman(true, 0.5, 3);
+	}
+
 	/** One attacker family's effect: probability per successful hit and base duration. */
 	public record MobEffectSetting(double chance, int seconds) {
 	}
@@ -214,7 +241,8 @@ public record PdConfig(
 			new EliteEffects(true, 30, new MobEffectSetting(0.35, 8), new MobEffectSetting(0.35, 5), new MobEffectSetting(0.50, 6),
 				new MobEffectSetting(0.25, 4), new MobEffectSetting(0.30, 3)),
 			EliteAlert.DEFAULTS,
-			EliteSkeleton.DEFAULTS
+			EliteSkeleton.DEFAULTS,
+			EliteEnderman.DEFAULTS
 		);
 	}
 }

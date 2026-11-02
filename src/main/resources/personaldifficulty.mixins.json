@@ -10,6 +10,8 @@
 		"CrossbowAimMixin",
 		"DrownedAimMixin",
 		"EnderDragonTargetMixin",
+		"EndermanAccess",
+		"EndermanBlindsideMixin",
 		"FoodDataMixin",
 		"IllusionerAimMixin",
 		"LivingEntityDamageMixin",

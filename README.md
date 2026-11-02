@@ -194,6 +194,22 @@ Skeletons, strays and bogged shooting at an **Elite** player; any other target g
   hit harder on their own; nothing compensates for that automatically. Measured numbers: see `docs/VERIFICATION.md` (opt-in
   measurement `measure_skeletonArrowDamageAtDistance_forSeveralArrowSpeeds`).
 
+#### Enderman Blindside (1.4.0)
+An Enderman that is **already angry** at an Elite player, or was just hit by their arrow or other projectile, may teleport to a
+spot **behind** them (opposite where they are looking) instead of where vanilla would put it: when it closes the distance (the
+player is more than 16 blocks away) and when it dodges a projectile. Melee hits never make an Enderman teleport, in vanilla or
+here.
+
+| Setting | Default | Effect |
+|---|---|---|
+| `elite.enderman.blindside-enabled` | **true** | Master switch. |
+| `elite.enderman.blindside-chance` | **0.5** | Probability per qualifying teleport. |
+| `elite.enderman.blindside-distance` | **3** | Blocks behind the player (2 .. 6), plus or minus one at random. |
+
+The spot needs solid ground, three blocks of headroom and no fluid, and vanilla's own teleport checks run on it; if no spot
+works, vanilla's teleport happens instead. Nothing makes an Enderman angry that vanilla would not, and its daylight teleport and
+reaction to being stared at are unchanged.
+
 #### Alert network and last-known-position search (1.4.0)
 A mob that **sees** an Elite player records where and when. Hostile mobs near it (`elite.alert.radius`, default 64 blocks) learn
 of that sighting, and may pass it on (`elite.alert.hops`, default 2). A mob with no target then walks to the **remembered point**
@@ -384,6 +400,9 @@ elite.skeleton.arrow-damage-multiplier=1.0     # 0.1 .. 3.0
 elite.skeleton.prediction-strength=1.0         # 0 .. 1
 elite.skeleton.max-range=24                    # 15 .. 48 blocks
 elite.skeleton.firing-interval-ticks=10        # 10 .. 60
+elite.enderman.blindside-enabled=true
+elite.enderman.blindside-chance=0.5            # 0 .. 1
+elite.enderman.blindside-distance=3            # 2 .. 6 blocks
 elite.effects.enabled=true
 elite.effects.max-duration-seconds=30         # 1 .. 60
 elite.effects.zombie-infection-chance=0.35    # per damaging hit, 0 .. 1

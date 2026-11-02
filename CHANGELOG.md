@@ -14,7 +14,17 @@
   vanilla arrow damage follows the speed at impact. Decision: keep `arrow-damage-multiplier` at 1.0, so the harder hits are part
   of Elite. Numbers in `docs/VERIFICATION.md`.
 
+* **Enderman Blindside** (plan 6.5): an Enderman that is already angry at an Elite player, or was just hit by their arrow or
+  other projectile, may land behind them (opposite where they look, about 3 blocks back, on solid ground with headroom) when it
+  closes the distance or dodges the projectile. `elite.enderman.blindside-enabled` (on), `blindside-chance` (0.5, chosen by the
+  user), `blindside-distance` (3). Vanilla's own teleport checks still apply; if no safe spot exists, vanilla's teleport happens.
+  Nothing makes an Enderman angry that vanilla would not; the daylight teleport and staring are untouched.
+
 ### Tests so far
+* Unit (Blindside): every candidate spot is behind the player for every look direction, Minecraft's yaw convention, bounded
+  distance and jitter.
+* GameTest (Blindside): 60 trials each of vanilla's "close the distance" teleport and the arrow dodge, against an Elite and a
+  Normal player: the Elite player gets the Enderman behind them about half the time, the Normal player practically never.
 * Unit: the aim solver hits a stationary target at 4 to 32 blocks for launch speeds 1.6 to 4.8, shows that vanilla's arc
   allowance overshoots at 1.5x speed, leads a target moving sideways at sprint speed, blends by strength and falls back to vanilla
   aim out of reach, at point blank and on garbage input.

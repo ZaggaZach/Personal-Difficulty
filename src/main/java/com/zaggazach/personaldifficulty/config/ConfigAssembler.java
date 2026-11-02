@@ -43,7 +43,9 @@ public final class ConfigAssembler {
 				b(values, "elite.alert.enabled"), i(values, "elite.alert.radius"), i(values, "elite.alert.hops"), i(values, "elite.alert.memory-seconds")),
 			new PdConfig.EliteSkeleton(
 				b(values, "elite.skeleton.enabled"), d(values, "elite.skeleton.arrow-speed-multiplier"), d(values, "elite.skeleton.arrow-damage-multiplier"),
-				d(values, "elite.skeleton.prediction-strength"), i(values, "elite.skeleton.max-range"), i(values, "elite.skeleton.firing-interval-ticks"))
+				d(values, "elite.skeleton.prediction-strength"), i(values, "elite.skeleton.max-range"), i(values, "elite.skeleton.firing-interval-ticks")),
+			new PdConfig.EliteEnderman(
+				b(values, "elite.enderman.blindside-enabled"), d(values, "elite.enderman.blindside-chance"), i(values, "elite.enderman.blindside-distance"))
 		);
 	}
 

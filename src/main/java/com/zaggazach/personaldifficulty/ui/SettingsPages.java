@@ -36,7 +36,7 @@ public enum SettingsPages {
 
 	private static boolean isEliteAdvanced(String key) {
 		return key.startsWith("elite.ai.") || key.startsWith("elite.priority.") || key.startsWith("elite.alert.") || key.startsWith("elite.effects.")
-			|| key.startsWith("elite.skeleton.");
+			|| key.startsWith("elite.skeleton.") || key.startsWith("elite.enderman.");
 	}
 
 	public String title() {

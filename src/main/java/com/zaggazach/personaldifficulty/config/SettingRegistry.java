@@ -124,6 +124,11 @@ public final class SettingRegistry {
 		e.add(num(o += 10, "elite.skeleton.prediction-strength", 0, 1, sk.predictionStrength(), 0.05, "Elite skeletons: aim prediction strength", live, "eliteSkeleton.predictionStrength", c -> c.eliteSkeleton().predictionStrength()));
 		e.add(whole(o += 10, "elite.skeleton.max-range", PdConfig.VANILLA_BOW_RANGE, PdConfig.MAX_BOW_RANGE, sk.maxRange(), "Elite skeletons: shooting range (blocks)", live, "eliteSkeleton.maxRange", c -> c.eliteSkeleton().maxRange()));
 		e.add(whole(o += 10, "elite.skeleton.firing-interval-ticks", PdConfig.MIN_FIRING_INTERVAL_TICKS, PdConfig.MAX_FIRING_INTERVAL_TICKS, sk.firingIntervalTicks(), "Elite skeletons: firing interval (ticks)", live, "eliteSkeleton.firingIntervalTicks", c -> c.eliteSkeleton().firingIntervalTicks()));
+		// Enderman Blindside (1.4.0, Phase 6)
+		PdConfig.EliteEnderman en = PdConfig.EliteEnderman.DEFAULTS;
+		e.add(flag(o += 10, "elite.enderman.blindside-enabled", en.enabled(), "Elite endermen: Blindside", live, "eliteEnderman.enabled", c -> c.eliteEnderman().enabled()));
+		e.add(num(o += 10, "elite.enderman.blindside-chance", 0, 1, en.chance(), 0.05, "Elite endermen: Blindside chance", live, "eliteEnderman.chance", c -> c.eliteEnderman().chance()));
+		e.add(whole(o += 10, "elite.enderman.blindside-distance", PdConfig.MIN_BLINDSIDE_DISTANCE, PdConfig.MAX_BLINDSIDE_DISTANCE, en.distance(), "Elite endermen: Blindside distance (blocks)", live, "eliteEnderman.distance", c -> c.eliteEnderman().distance()));
 		// Elite mob effects
 		e.add(flag(o += 10, "elite.effects.enabled", true, "Elite effects: enabled", live, "eliteEffects.enabled", c -> c.eliteEffects().enabled()));
 		e.add(whole(o += 10, "elite.effects.max-duration-seconds", 1, PdConfig.MAX_EFFECT_SECONDS, 30, "Elite effects: maximum duration (seconds)", live, "eliteEffects.maxDurationSeconds", c -> c.eliteEffects().maxDurationSeconds()));
