@@ -15,7 +15,11 @@ mutation check, non-Elite behaviour unchanged, the performance budget). Facts be
 | Magma cube | `AbstractCubeMob`, not a `Monster` | no | documented by a non-required test |
 | Ghast | `Mob implements Enemy`, not a `Monster` | no | documented by a non-required test |
 
-Decision path: if blaze and wither skeleton pass, they are listed as supported (they are already affected today). Ghast and magma
+**Result (2 November 2026):** all four acquire an Elite player beyond their vanilla range and never a Normal one. The
+prediction above was half wrong: ghasts and magma cubes are covered too, because the acquisition hook sits in vanilla's
+`NearestAttackableTargetGoal` itself; only the hunting scan (`PdHunt.participates`) is limited to `Monster`s.
+
+Original decision path: if blaze and wither skeleton pass, they are listed as supported (they are already affected today). Ghast and magma
 cube stay unsupported unless you ask for them (it would mean widening `participates` beyond `Monster`).
 
 ## 2. Warden

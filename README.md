@@ -140,8 +140,11 @@ Which mobs are covered: the acquisition, pursuit and memory hooks sit in the van
 hostile uses (`NearestAttackableTargetGoal`, `TargetGoal`, `PathNavigation`), so any mob built on them is covered by
 construction, but only the mobs in the table were actually run through the live AI and **only those are claimed**. Not
 claimed (not tested, or known not to apply): spiders and cave spiders (their own night-only goal), endermen (provoked by gaze), phantoms, drowned, guardians, piglin-family
-and hoglins, the Warden, the Ender Dragon, blazes, ghasts, breezes, the Wither, illagers other than the vindicator and
-pillager, zombified piglins, and all modded mobs.
+and hoglins, the Ender Dragon, breezes, the Wither, illagers other than the vindicator and pillager, zombified piglins, and all
+modded mobs. **Verified live in 1.4.0:** blazes, wither skeletons, ghasts and magma cubes acquire an Elite player beyond their
+vanilla range and never a Normal one. Blazes and wither skeletons also get the hunting scan (preference, alerts, last-known
+search, giving up); ghasts and magma cubes only the wider acquisition (they are not `Monster`s). The Warden is handled
+separately (anger, below).
 
 #### Hunted: hostile mobs prefer Elite players (1.3.0)
 Hostile mobs now prefer an eligible Elite player over any other player - **including one they are already fighting**.
@@ -223,7 +226,7 @@ Each applies only while the mob is hunting an **Elite** player.
 | `elite.warden.enabled` | **false** | Wardens get angry at Elite players faster: anger from their own senses (vibrations, smell, being hit) is multiplied. No extra range, nothing through walls. |
 | `elite.warden.anger-multiplier` | **2.0** | The factor (1.0 .. 3.0): 2.0 means two vibrations instead of three before it attacks. |
 
-Not affected: piglins, piglin brutes, hoglins and zoglins (brain-based AI; deferred), ghasts and magma cubes.
+Not affected: piglins, piglin brutes, hoglins and zoglins (brain-based AI; deferred).
 
 #### Alert network and last-known-position search (1.4.0)
 A mob that **sees** an Elite player records where and when. Hostile mobs near it (`elite.alert.radius`, default 64 blocks) learn

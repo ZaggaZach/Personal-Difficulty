@@ -1,23 +1,34 @@
 # Changelog
 
-## Unreleased: Phase 7 of the 1.4.0 line (spikes), in progress
+## 1.3.1-rc.6: UNPUBLISHED development checkpoint (Phase 7 of the 1.4.0 line: spikes)
 
-### Added so far
+> **Status: a private checkpoint, NOT published.** Builds on `1.3.1-rc.5`.
+>
+> **Phase 7 build: PASSED (2 November 2026).** `./gradlew build` green: unit tests and all 187 required GameTests (the ghast and
+> magma cube tests became required afterwards, on the values that run measured). The witch item of this phase was done in
+> Phase 5. **In-game test: pending** (only the Warden is new, and it is off by default).
+
+### Added
 * **Wardens** (spike passed its design review; `elite.warden.enabled`, **off** by default): the anger a Warden gains toward an
   Elite player through vanilla's own senses (vibrations, smell, being hit; all through `increaseAngerAt`) is multiplied by
   `elite.warden.anger-multiplier` (2.0), so it attacks after two vibrations instead of three. No extra range, no sensing through
   walls, no forced targeting.
-* **Nether mobs:** blazes and wither skeletons have been covered by the Elite hunting since 1.3.0 by construction (they are
-  `Monster`s with a player-targeting goal); now tested live. Ghasts and magma cubes are not covered (not `Monster`s).
+* **Nether mobs, measured:** blazes, wither skeletons, ghasts and magma cubes all acquire an Elite player beyond their vanilla
+  range and never a Normal one (blaze 86.8 blocks against a 48.2 range; wither skeleton 30.3 / 15.1; magma cube 31.8 / 15.9;
+  ghast 110 / 106). This has been so since 1.3.0 by construction (the acquisition hook sits in vanilla's
+  `NearestAttackableTargetGoal`) and was never claimed. Correction to the spike note: ghasts and magma cubes ARE covered by the
+  wider acquisition; only the hunting scan (preference, alerts, last-known search, giving up) is limited to `Monster`s, so blazes
+  and wither skeletons get that too and ghasts and magma cubes do not.
 
 ### Deferred (decided)
 * **Piglins, piglin brutes, hoglins, zoglins:** brain-based AI that none of the Elite hunting applies to, with risks to bartering
   and other vanilla behaviour. Not in 1.4.0. Feasibility notes: `docs/PHASE7-SPIKES.md`.
 
-### Tests so far
+### Tests
 * GameTests: Warden anger from vanilla's entry point doubled for an Elite player only; live footstep vibrations anger a Warden
   after two from an Elite player and not after two from a Normal one (both in `elite_mobs_on`). Blaze and wither skeleton acquire
-  an Elite player beyond their vanilla range and never a Normal one; ghast and magma cube documented by non-required tests.
+  an Elite player beyond their vanilla range and never a Normal one; ghast and magma cube likewise (now required tests too).
+  Live Warden run: anger after vibrations 1/2/3 was 68/150/148 for the Elite player and 33/66/148 for the Normal one.
 
 ## 1.3.1-rc.5: UNPUBLISHED development checkpoint (Phase 6 of the 1.4.0 line: individual mobs)
 

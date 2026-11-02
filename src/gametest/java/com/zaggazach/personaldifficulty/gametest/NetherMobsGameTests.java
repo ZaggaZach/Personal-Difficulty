@@ -17,10 +17,9 @@ import net.minecraft.world.entity.Mob;
 /**
  * 1.4.0, Phase 7 spike (plan 6.8): which goal-based Nether mobs the Elite hunting already applies to, measured live. Blazes and
  * wither skeletons are {@code Monster}s with a player-targeting goal, so the hunting scan covers them by construction (since
- * 1.3.0, never claimed); ghasts and magma cubes are not {@code Monster}s, so it does not. Each test gives the mob its own arena per
- * lane: an Elite player at {@code factor} times the mob's vanilla follow range, and a Normal player at the same distance.
- *
- * <p>Reports only for the mobs expected NOT to be covered (they document the current behaviour); the covered ones must pass.
+ * 1.3.0, never claimed); ghasts and magma cubes are not {@code Monster}s, so it does not, but the wider acquisition sits in
+ * vanilla's own target goal and covers them too (measured). Each test gives the mob its own arena per lane: an Elite player at
+ * {@code factor} times the mob's vanilla follow range, and a Normal player at the same distance.
  */
 public class NetherMobsGameTests {
 	private record Result(double range, double distance, boolean eliteBeyondVanilla, int normalBeyondVanilla) {
@@ -85,15 +84,21 @@ public class NetherMobsGameTests {
 		});
 	}
 
-	/** Not covered by construction (not a Monster): documents the behaviour, does not fail on it. */
-	@GameTest(maxTicks = 260, required = false)
-	public void nether_magmaCube_isNotCoveredByTheEliteHunting(GameTestHelper h) {
-		lane(h, EntityTypes.MAGMA_CUBE, 119, 120, 2.0, "mc", r -> check(r.normalBeyondVanilla() == 0, "never a Normal player: " + r));
+	/** Not a Monster, so no hunting scan; the wider acquisition (a hook in vanilla's own target goal) still applies (measured). */
+	@GameTest(maxTicks = 260)
+	public void nether_magmaCube_acquiresAnElitePlayerBeyondItsVanillaRange_neverANormalOne(GameTestHelper h) {
+		lane(h, EntityTypes.MAGMA_CUBE, 119, 120, 2.0, "mc", r -> {
+			check(r.eliteBeyondVanilla(), "a magma cube acquires an Elite player beyond its vanilla range: " + r);
+			check(r.normalBeyondVanilla() == 0, "never a Normal player: " + r);
+		});
 	}
 
-	/** Not covered by construction (not a Monster): documents the behaviour, does not fail on it. */
-	@GameTest(maxTicks = 260, required = false)
-	public void nether_ghast_isNotCoveredByTheEliteHunting(GameTestHelper h) {
-		lane(h, EntityTypes.GHAST, 121, 122, 1.08, "gh", r -> check(r.normalBeyondVanilla() == 0, "never a Normal player: " + r));
+	/** Not a Monster, so no hunting scan; the wider acquisition (a hook in vanilla's own target goal) still applies (measured). */
+	@GameTest(maxTicks = 260)
+	public void nether_ghast_acquiresAnElitePlayerBeyondItsVanillaRange_neverANormalOne(GameTestHelper h) {
+		lane(h, EntityTypes.GHAST, 121, 122, 1.08, "gh", r -> {
+			check(r.eliteBeyondVanilla(), "a ghast acquires an Elite player beyond its vanilla range: " + r);
+			check(r.normalBeyondVanilla() == 0, "never a Normal player: " + r);
+		});
 	}
 }
