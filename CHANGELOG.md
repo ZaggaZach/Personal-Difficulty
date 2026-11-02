@@ -1,8 +1,16 @@
 # Changelog
 
-## Unreleased: Phase 6 of the 1.4.0 line (Batch A: individual mobs), in progress
+## 1.3.1-rc.5: UNPUBLISHED development checkpoint (Phase 6 of the 1.4.0 line: individual mobs)
 
-### Added so far
+> **Status: a private checkpoint, NOT published.** Builds on `1.3.1-rc.4`.
+>
+> **Phase 6 build: PASSED (2 November 2026).** `./gradlew build` green: unit tests and all 181 required GameTests. Measured in
+> that run: creeper fuse 20 ticks against an Elite player, 30 against a Normal one; a zombie broke an Elite player's door at tick
+> 568 in a Normal world and left the Normal player's door intact; pillagers fired every 33 ticks at an Elite player against 62.
+> **In-game test: pending.** Spiders, drowned and vindicators were not given extra behaviour (decided: they keep the Elite hunting,
+> range, alerts and effects only).
+
+### Added
 * **Elite skeletons** (plan 6.4; skeletons, strays, bogged; only while the target is an Elite player): arrow speed 1.5x
   (`elite.skeleton.arrow-speed-multiplier`), a separate base-damage scale (`arrow-damage-multiplier`, default 1.0, no automatic
   compensation for speed), predictive aim (`prediction-strength`, default 1.0: solves the arc with vanilla arrow physics and
@@ -26,7 +34,7 @@
   (`elite.creeper.short-fuse`, **off** by default); pillagers fire `elite.pillager.attack-delay-ticks` (5) after charging instead
   of 20 to 39 (`elite.pillager.fast-crossbow`, on).
 
-### Tests so far
+### Tests
 * GameTests (other mobs): an Elite pillager fires clearly more often than a Normal one; a creeper's fuse is about 20 ticks against
   an Elite player and vanilla's 30 against a Normal one; a zombie breaks the door of a room holding an Elite player in a Normal
   world and leaves a Normal player's door alone (the last two in their own environment, `elite_mobs_on`).
