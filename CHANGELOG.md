@@ -1,8 +1,15 @@
 # Changelog
 
-## Unreleased: Phase 8 of the 1.4.0 line (effects expansion), in progress
+## 1.3.1-rc.7: UNPUBLISHED development checkpoint (Phase 8 of the 1.4.0 line: effects expansion)
 
-### Added so far (the four effects chosen by the user)
+> **Status: a private checkpoint, NOT published.** Builds on `1.3.1-rc.6`.
+>
+> **Phase 8 build: PASSED (3 November 2026).** `./gradlew build` green: unit tests and all 190 required GameTests. Measured:
+> Mining Fatigue 120 ticks, Wither 300 ticks (vanilla 200), fireball burn 180 ticks (vanilla 100). The live Warden test was made
+> robust in this phase (vanilla sniffing put on cooldown; it added anger at random times): anger after vibrations 1/2/3 was
+> 69/150/149 for an Elite player and 34/67/119 for a Normal one. **In-game test: pending.**
+
+### Added (the four effects chosen by the user)
 * Vindicator melee: Mining Fatigue I (35 %, 6 s). Enderman melee: Darkness (50 %, 4 s).
 * Wither skeleton melee: vanilla's own Wither lasts 5 s longer (50 %): an agreed exception to the rule of never adding to a
   vanilla effect; the Wither is extended, never applied twice or strengthened.
@@ -10,7 +17,7 @@
 * All four only on real damage to an Elite player, capped by `elite.effects.max-duration-seconds`, each with its own chance and
   seconds setting (`elite.effects.vindicator-fatigue-*`, `enderman-darkness-*`, `wither-skeleton-wither-*`, `fireball-burn-*`).
 
-### Tests so far
+### Tests
 * GameTests: each effect on a real hit (the fireball through vanilla's own fireball damage after ignition); no effect for Normal,
   Easy, Hard or Peaceful players and vanilla's own Wither and burn unchanged for them; every duration capped by the maximum.
   The 1.3.0 "unrelated damage" test no longer lists a vindicator melee hit as unrelated (it now has an effect).
