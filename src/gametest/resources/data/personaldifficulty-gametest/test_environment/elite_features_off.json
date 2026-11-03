@@ -1,0 +1,5 @@
+{
+	"type": "minecraft:function",
+	"setup": "personaldifficulty-gametest:features_off",
+	"teardown": "personaldifficulty-gametest:features_back"
+}

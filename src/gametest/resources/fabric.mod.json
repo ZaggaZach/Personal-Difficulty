@@ -31,7 +31,8 @@
 			"com.zaggazach.personaldifficulty.gametest.EndermanBlindsideGameTests",
 			"com.zaggazach.personaldifficulty.gametest.EliteMobsGameTests",
 			"com.zaggazach.personaldifficulty.gametest.NetherMobsGameTests",
-			"com.zaggazach.personaldifficulty.gametest.WardenGameTests"
+			"com.zaggazach.personaldifficulty.gametest.WardenGameTests",
+			"com.zaggazach.personaldifficulty.gametest.MutationGameTests"
 		]
 	},
 	"depends": {
