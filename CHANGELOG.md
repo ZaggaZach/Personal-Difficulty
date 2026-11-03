@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.0-rc.1: UNPUBLISHED release candidate (Phase 9 of the 1.4.0 line: release gate)
+
+> **Status: a release candidate, NOT published, NOT tagged.** Same code as `1.3.1-rc.7` plus the Phase 9 mutation tests; only
+> the version name changes in the mod itself.
+>
+> **Release gate (3 November 2026), from commit `5e880b6`:** unit tests and all 196 required GameTests green in three runs in a
+> row plus the performance run; every risky feature's mutation check passed in all four runs; performance within target
+> (+0.40 ms per tick with everything new on, +0.71 ms in the worst-case unreachable-player test, target 1.00 ms); the JAR is
+> byte-identical across clean rebuilds. Details: `docs/VERIFICATION.md`, "1.4.0 Phase 9". **Dedicated-server smoke test:
+> pending.**
+
+### Tests
+* `MutationGameTests`: each risky feature (skeleton speed and prediction, Blindside, fast pillagers, creeper fuse, zombie
+  door-breaking, Warden anger) switched off must give an Elite player vanilla behaviour. The features that ship on are switched
+  off by the new `elite_features_off` test environment.
+
 ## 1.3.1-rc.7: UNPUBLISHED development checkpoint (Phase 8 of the 1.4.0 line: effects expansion)
 
 > **Status: a private checkpoint, NOT published.** Builds on `1.3.1-rc.6`.
