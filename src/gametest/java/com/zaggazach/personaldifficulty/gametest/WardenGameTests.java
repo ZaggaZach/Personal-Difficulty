@@ -44,7 +44,8 @@ public class WardenGameTests {
 
 	/**
 	 * Live: footstep vibrations emitted by each player next to a Warden of their own, through vanilla's game-event system (the
-	 * Warden's listener decides whether it hears them). One every 50 ticks (the listener's cooldown is 40).
+	 * Warden's listener decides whether it hears them). One every 50 ticks (the listener's cooldown is 40); anger read 15 ticks
+	 * after each. The Wardens' own sniffing is on cooldown (it adds anger at random times, which is not what this measures).
 	 */
 	@GameTest(environment = MOBS_ON, maxTicks = 240)
 	public void warden_isAngeredByFewerVibrationsFromAnElitePlayer(GameTestHelper h) {
@@ -56,6 +57,9 @@ public class WardenGameTests {
 		int[][] angerAfter = new int[2][3];
 		for (int i = 0; i < 2; i++) {
 			wardens[i] = (Warden) arenas[i].spawn(EntityTypes.WARDEN, 50, 50);
+			// found in a run: vanilla's own sniffing (anger toward the nearest player, at random times) added anger between two
+			// vibrations; the test measures vibrations, so sniffing is put on cooldown for the whole test
+			wardens[i].getBrain().setMemoryWithExpiry(net.minecraft.world.entity.ai.memory.MemoryModuleType.SNIFF_COOLDOWN, net.minecraft.util.Unit.INSTANCE, 100000L);
 			players[i] = arenas[i].player(h, "pd_wv_" + i, modes[i], 56, 50);
 			players[i].addEffect(new MobEffectInstance(MobEffects.RESISTANCE, 100000, 4, false, false));
 		}
@@ -69,7 +73,7 @@ public class WardenGameTests {
 				if (t % 50 == 10 && t / 50 < 3) {
 					level.gameEvent(players[i], GameEvent.STEP, players[i].position());
 				}
-				if (t % 50 == 45 && t / 50 < 3) {
+				if (t % 50 == 25 && t / 50 < 3) { // the listener needs about one tick per block, then its own short delay
 					angerAfter[i][(int) (t / 50)] = wardens[i].getAngerManagement().getActiveAnger(players[i]);
 				}
 			}
