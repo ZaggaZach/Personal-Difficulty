@@ -486,3 +486,57 @@ every tested distance, and 2.0x arrows about 90% more, with `arrow-damage-multip
 automatically (plan 6.4); `arrow-damage-multiplier` is the separate control for it.
 
 Decision (2 November 2026): `arrow-damage-multiplier` stays at 1.0; the harder hits from faster arrows are intended for Elite.
+
+## 1.4.0 Phase 9: release gate (3 November 2026, 26.3, Windows 11, Java 25.0.5, 16 threads)
+
+All results below were produced from branch `feature/1.4.0-p9-release` at commit `5e880b6` (built as `1.3.1-rc.7`) on the
+maintainer's PC and read from the Gradle logs.
+
+### Suites, three times in a row: **PASS**
+
+| Run | Command | GameTests | Unit tests | Result |
+|---|---|---|---|---|
+| 1 | `gradlew build` | 196 / 196 required | pass | BUILD SUCCESSFUL in 1m 1s |
+| 2 | `gradlew build --rerun-tasks` | 196 / 196 required | pass | BUILD SUCCESSFUL in 1m 10s |
+| 3 | `gradlew build --rerun-tasks` | 196 / 196 required | pass | BUILD SUCCESSFUL in 1m 7s |
+| perf | `gradlew build --rerun-tasks -PpdPerf=true` | 196 / 196 required | pass | BUILD SUCCESSFUL in 1m 22s |
+
+### Mutation checks (plan section 8): **PASS in all four runs**
+
+Each risky feature's scenario rerun with the feature switched off (`MutationGameTests`); an Elite player must then get vanilla
+behaviour, which shows that the feature's own test depends on its hook.
+
+| Feature switched off | Elite result, runs 1 / 2 / 3 / perf | Vanilla expectation |
+|---|---|---|
+| Skeleton speed + prediction | speed 1.601 / 1.600 / 1.600 / 1.600, sideways aim within 0.001 | 1.6, no lead |
+| Enderman Blindside | behind the player 1 / 0 / 0 / 0 of 80 | at most 2 |
+| Pillager fast crossbow | Elite vs Normal shots 7-7 / 7-8 / 8-8 / 8-8 | Elite at most 1.2x Normal |
+| Creeper short fuse (off by default) | 30 ticks in every run | 28-33 |
+| Zombie door-breaking (off by default) | door intact in every run (Normal world) | intact |
+| Warden anger (off by default) | 35 to 35 in every run | 35 |
+
+### Final performance report: **WITHIN TARGET**
+
+| Scenario | Extra time per server tick | Target |
+|---|---|---|
+| 150 zombies + 50 skeletons, 5 players, everything new on | +0.40 ms over nobody on Elite (3.00 ms baseline) | at most +1.00 ms |
+| Elite, 1.3 behaviour | +0.17 ms | - |
+| Elite + 3x detection, 5x memory, 128 cap | +0.39 ms | - |
+| Elite + alert network only | +0.74 ms | - |
+| Unreachable player on a pillar, 18-26 blocks (worst case) | +0.71 ms | at most +1.00 ms |
+| Unreachable player, 44-58 blocks | +0.71 ms (more zombies hunt: 25 vs 12; the feature itself) | - |
+
+One stall was sampled: 306 ms at tick 6000, in vanilla's 5-minute autosave (`PlayerDataStorage.save`, file creation), not in mod code.
+
+### Reproducible JAR: **PASS**
+
+| Build | `personal-difficulty-1.3.1-rc.7.jar` sha256 | `-sources.jar` sha256 |
+|---|---|---|
+| The tested build (perf run) | `AD4D7D1FB1DBFBA9ACB025CCC7375D8EE363FA853DA094F1155D1AE37730F51D` | `0EBF310147B14E280662C6EC0484363528E29188B6EDB5428D9C0956EC2925EE` |
+| `clean build` 1 | identical | identical |
+| `clean build` 2 | identical | identical |
+
+### Still to do before the 1.4.0 release candidate
+
+- Dedicated-server smoke test of the release JAR on the real server.
+- Final documentation pass listing what was and was not tested.
