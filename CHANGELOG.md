@@ -6,7 +6,7 @@
 >
 > **Phase 7 build: PASSED (2 November 2026).** `./gradlew build` green: unit tests and all 187 required GameTests (the ghast and
 > magma cube tests became required afterwards, on the values that run measured). The witch item of this phase was done in
-> Phase 5. **In-game test: pending** (only the Warden is new, and it is off by default).
+> Phase 5. **In-game test: PASSED (3 November 2026, confirmed by the user).**
 
 ### Added
 * **Wardens** (spike passed its design review; `elite.warden.enabled`, **off** by default): the anger a Warden gains toward an
