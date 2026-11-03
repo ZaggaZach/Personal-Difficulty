@@ -146,7 +146,11 @@ public final class SettingRegistry {
 			{"spider-venom", "spider", "Spider venom", "0.35", "5"},
 			{"cave-spider-venom", "caveSpider", "Cave spider venom", "0.50", "6"},
 			{"skeleton-shot", "skeleton", "Skeleton shot", "0.25", "4"},
-			{"drowned-chill", "drowned", "Drowned chill", "0.30", "3"}
+			{"drowned-chill", "drowned", "Drowned chill", "0.30", "3"},
+			{"vindicator-fatigue", "vindicator", "Vindicator fatigue", "0.35", "6"},
+			{"enderman-darkness", "enderman", "Enderman darkness", "0.50", "4"},
+			{"wither-skeleton-wither", "witherSkeleton", "Wither skeleton: extra wither", "0.50", "5"},
+			{"fireball-burn", "fireball", "Fireball: extra burn", "0.50", "4"}
 		};
 		for (String[] f : effects) {
 			String key = "elite.effects." + f[0];
@@ -165,6 +169,10 @@ public final class SettingRegistry {
 			case "caveSpider" -> fx.caveSpider();
 			case "skeleton" -> fx.skeleton();
 			case "drowned" -> fx.drowned();
+			case "vindicator" -> fx.vindicator();
+			case "enderman" -> fx.enderman();
+			case "witherSkeleton" -> fx.witherSkeleton();
+			case "fireball" -> fx.fireball();
 			default -> throw new IllegalArgumentException(field);
 		};
 	}

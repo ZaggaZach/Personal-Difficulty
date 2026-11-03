@@ -250,8 +250,23 @@ public record PdConfig(
 		MobEffectSetting spider,
 		MobEffectSetting caveSpider,
 		MobEffectSetting skeleton,
-		MobEffectSetting drowned
+		MobEffectSetting drowned,
+		MobEffectSetting vindicator,
+		MobEffectSetting enderman,
+		MobEffectSetting witherSkeleton,
+		MobEffectSetting fireball
 	) {
+		/** Phase 8 additions (chance, seconds): vindicator Mining Fatigue, Enderman Darkness, longer Wither, longer burn. */
+		public static final MobEffectSetting VINDICATOR = new MobEffectSetting(0.35, 6);
+		public static final MobEffectSetting ENDERMAN = new MobEffectSetting(0.50, 4);
+		public static final MobEffectSetting WITHER_SKELETON = new MobEffectSetting(0.50, 5);
+		public static final MobEffectSetting FIREBALL = new MobEffectSetting(0.50, 4);
+
+		/** The 1.3.0 form (tests and the frozen oracle); the Phase 8 effects are the defaults. */
+		public EliteEffects(boolean enabled, int maxDurationSeconds, MobEffectSetting zombie, MobEffectSetting spider, MobEffectSetting caveSpider,
+			MobEffectSetting skeleton, MobEffectSetting drowned) {
+			this(enabled, maxDurationSeconds, zombie, spider, caveSpider, skeleton, drowned, VINDICATOR, ENDERMAN, WITHER_SKELETON, FIREBALL);
+		}
 	}
 
 	/** Which ranged attacker families have their aim adjusted (Easy: wider, Elite: tighter). */

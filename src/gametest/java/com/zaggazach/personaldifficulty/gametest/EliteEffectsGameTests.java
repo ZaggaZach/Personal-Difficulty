@@ -181,11 +181,10 @@ public class EliteEffectsGameTests {
 		withConfig(ALWAYS, () -> {
 			Mob zombie = mob(h, EntityTypes.ZOMBIE, elite);
 			Mob husk = mob(h, EntityTypes.HUSK, elite);
-			Mob vindicator = mob(h, EntityTypes.VINDICATOR, elite);
 			List<DamageSource> unrelated = List.of(
 				level.damageSources().fall(), level.damageSources().onFire(), level.damageSources().inFire(), level.damageSources().magic(),
 				level.damageSources().explosion(zombie, zombie), level.damageSources().thorns(zombie), level.damageSources().indirectMagic(zombie, zombie),
-				level.damageSources().playerAttack(other), level.damageSources().mobAttack(vindicator), level.damageSources().mobAttack(husk),
+				level.damageSources().playerAttack(other), level.damageSources().mobAttack(husk),
 				level.damageSources().cactus(), level.damageSources().drown());
 			for (DamageSource source : unrelated) {
 				elite.setHealth(20.0F);
@@ -199,6 +198,93 @@ public class EliteEffectsGameTests {
 			elite.hurtServer(level, level.damageSources().mobProjectile(zombie, zombie), 2.0F);
 			check(applied(elite) == 0, "a zombie's non-melee damage never infects");
 			check(amp(elite, MobEffects.HUNGER) == -1, "premise: no vanilla husk Hunger leaked in from the husk call either");
+		});
+		h.succeed();
+	}
+
+	// ------------------------------------------------------------------ 1.4.0, Phase 8
+
+	private static final String ALWAYS_8 = "elite.effects.vindicator-fatigue-chance=1.0\nelite.effects.enderman-darkness-chance=1.0\n"
+		+ "elite.effects.wither-skeleton-wither-chance=1.0\nelite.effects.fireball-burn-chance=1.0\n";
+
+	/** A blaze fireball's real hit: vanilla sets the target on fire first, then deals the fireball damage. */
+	private static void fireballHit(ServerLevel level, Mob blaze, ServerPlayer victim) {
+		victim.setHealth(20.0F);
+		victim.damageCooldownTime = 0;
+		victim.setRemainingFireTicks(0);
+		var fireball = new net.minecraft.world.entity.projectile.hurtingprojectile.SmallFireball(level, blaze, Vec3.ZERO);
+		victim.igniteForSeconds(5.0F);
+		victim.hurtServer(level, level.damageSources().fireball(fireball, blaze), 5.0F);
+		fireball.discard();
+	}
+
+	@GameTest
+	public void direct_phase8_vindicatorEndermanWitherSkeletonAndFireball_onAnElitePlayer(GameTestHelper h) {
+		ServerLevel level = h.getLevel();
+		ServerPlayer elite = player(h, "pd_e8_e", ELITE);
+		withConfig(ALWAYS_8, () -> {
+			Mob vindicator = mob(h, EntityTypes.VINDICATOR, elite);
+			check(hit(level, vindicator, elite) && elite.getHealth() < 20.0F, "premise: the vindicator's real attack lands and hurts");
+			check(amp(elite, MobEffects.MINING_FATIGUE) == 0 && dur(elite, MobEffects.MINING_FATIGUE) > 0 && dur(elite, MobEffects.MINING_FATIGUE) <= 6 * 20,
+				"vindicator: Mining Fatigue I for at most 6 s (" + dur(elite, MobEffects.MINING_FATIGUE) + " ticks)");
+			elite.removeAllEffects();
+
+			Mob enderman = mob(h, EntityTypes.ENDERMAN, elite);
+			hit(level, enderman, elite);
+			check(elite.hasEffect(MobEffects.DARKNESS) && dur(elite, MobEffects.DARKNESS) <= 4 * 20, "enderman: Darkness for at most 4 s (" + dur(elite, MobEffects.DARKNESS) + " ticks)");
+			elite.removeAllEffects();
+
+			Mob witherSkeleton = mob(h, EntityTypes.WITHER_SKELETON, elite);
+			hit(level, witherSkeleton, elite);
+			int wither = dur(elite, MobEffects.WITHER);
+			check(amp(elite, MobEffects.WITHER) == 0, "wither skeleton: still Wither I (never strengthened)");
+			check(wither > 200 && wither <= 300, "wither skeleton: vanilla's 10 s Wither lasts 5 s longer (" + wither + " ticks; vanilla 200)");
+			elite.removeAllEffects();
+
+			Mob blaze = mob(h, EntityTypes.BLAZE, elite);
+			fireballHit(level, blaze, elite);
+			int fire = elite.getRemainingFireTicks();
+			check(fire > 100 && fire <= 180, "blaze fireball: the 5 s burn lasts 4 s longer (" + fire + " ticks; vanilla 100)");
+			System.out.printf("EFFECTS-8 mining fatigue %d, wither %d, fire %d ticks%n", 6 * 20, wither, fire);
+		});
+		h.succeed();
+	}
+
+	@GameTest
+	public void direct_phase8_otherDifficultiesAndPeaceful_neverGetThem_andVanillaWitherIsUnchanged(GameTestHelper h) {
+		ServerLevel level = h.getLevel();
+		withConfig(ALWAYS_8, () -> {
+			for (PersonalDifficultyMode m : List.of(PersonalDifficultyMode.NORMAL, PersonalDifficultyMode.EASY, PersonalDifficultyMode.HARD, PersonalDifficultyMode.PEACEFUL)) {
+				ServerPlayer p = player(h, "pd_e8_" + m.commandName(), m);
+				hit(level, mob(h, EntityTypes.VINDICATOR, p), p);
+				hit(level, mob(h, EntityTypes.ENDERMAN, p), p);
+				check(applied(p) == 0 && !p.hasEffect(MobEffects.MINING_FATIGUE) && !p.hasEffect(MobEffects.DARKNESS), m + ": no Elite effect");
+				p.removeAllEffects();
+				hit(level, mob(h, EntityTypes.WITHER_SKELETON, p), p);
+				if (m != PersonalDifficultyMode.PEACEFUL) {
+					check(dur(p, MobEffects.WITHER) <= 200, m + ": vanilla's own Wither, never longer (" + dur(p, MobEffects.WITHER) + ")");
+				} else {
+					check(!p.hasEffect(MobEffects.WITHER), "Peaceful: no Wither at all (harmful effects are blocked for Peaceful)");
+				}
+				fireballHit(level, mob(h, EntityTypes.BLAZE, p), p);
+				check(p.getRemainingFireTicks() <= 100, m + ": vanilla's burn only (" + p.getRemainingFireTicks() + ")");
+			}
+		});
+		h.succeed();
+	}
+
+	@GameTest
+	public void direct_phase8_durationsAreCappedByTheMaximum(GameTestHelper h) {
+		ServerLevel level = h.getLevel();
+		ServerPlayer elite = player(h, "pd_e8_cap", ELITE);
+		withConfig(ALWAYS_8 + "elite.effects.max-duration-seconds=3\nelite.effects.vindicator-fatigue-seconds=60\nelite.effects.enderman-darkness-seconds=60\n"
+			+ "elite.effects.fireball-burn-seconds=60\n", () -> {
+			hit(level, mob(h, EntityTypes.VINDICATOR, elite), elite);
+			check(dur(elite, MobEffects.MINING_FATIGUE) <= 60, "Mining Fatigue capped at 3 s (" + dur(elite, MobEffects.MINING_FATIGUE) + ")");
+			hit(level, mob(h, EntityTypes.ENDERMAN, elite), elite);
+			check(dur(elite, MobEffects.DARKNESS) <= 60, "Darkness capped at 3 s (" + dur(elite, MobEffects.DARKNESS) + ")");
+			fireballHit(level, mob(h, EntityTypes.BLAZE, elite), elite);
+			check(elite.getRemainingFireTicks() <= 100, "the burn is never extended past the cap; vanilla's own 5 s stay (" + elite.getRemainingFireTicks() + ")");
 		});
 		h.succeed();
 	}

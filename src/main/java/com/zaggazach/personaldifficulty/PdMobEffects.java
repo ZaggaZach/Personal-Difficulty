@@ -43,6 +43,9 @@ public final class PdMobEffects {
 	private static ServerPlayer notedPlayer;
 	private static float notedTotal;
 
+	/** Vanilla's Wither duration from a wither skeleton hit. */
+	static final int VANILLA_WITHER_TICKS = 200;
+
 	private PdMobEffects() {
 	}
 
@@ -89,6 +92,25 @@ public final class PdMobEffects {
 				strike(player, attacker, cfg.caveSpider(), cfg, MobEffects.SLOWNESS, 1);
 			} else if (type == EntityTypes.DROWNED) {
 				strike(player, attacker, cfg.drowned(), cfg, MobEffects.SLOWNESS, 0);
+			} else if (type == EntityTypes.VINDICATOR) {
+				strike(player, attacker, cfg.vindicator(), cfg, MobEffects.MINING_FATIGUE, 0);
+			} else if (type == EntityTypes.ENDERMAN) {
+				strike(player, attacker, cfg.enderman(), cfg, MobEffects.DARKNESS, 0);
+			} else if (type == EntityTypes.WITHER_SKELETON) {
+				// vanilla applies Wither (200 ticks) right after this hit; giving it the longer duration now means vanilla's own
+				// application keeps the longer one (the same effect at the same level is never shortened): extended, not doubled
+				if (roll(player, cfg.witherSkeleton())) {
+					applied(player);
+					refresh(player, attacker, MobEffects.WITHER, 0, VANILLA_WITHER_TICKS + cfg.witherSkeleton().seconds() * 20, cfg.maxDurationSeconds() * 20);
+				}
+			}
+		} else if ((source.is(DamageTypes.FIREBALL) || source.is(DamageTypes.UNATTRIBUTED_FIREBALL)) && (type == EntityTypes.BLAZE || type == EntityTypes.GHAST)
+			&& player.getRemainingFireTicks() > 0) {
+			// the fireball has already set the player on fire (vanilla ignites before it deals damage): that burn lasts longer
+			if (roll(player, cfg.fireball())) {
+				applied(player);
+				int extended = Math.min(cfg.maxDurationSeconds() * 20, player.getRemainingFireTicks() + cfg.fireball().seconds() * 20);
+				player.setRemainingFireTicks(Math.max(player.getRemainingFireTicks(), extended));
 			}
 		} else if (arrow && type == EntityTypes.SKELETON) {
 			// strays (vanilla slowness arrows) and bogged (poison arrows) already carry their own effect: no second one

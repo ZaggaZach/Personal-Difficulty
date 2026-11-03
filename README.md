@@ -265,6 +265,10 @@ arrow. Fire, poison, explosions, thorns, falls, PvP and every other source never
 | Cave spider | Slowness II | 50 % | 6 s | On top of vanilla's own poison (Normal/Hard worlds). |
 | Skeleton | Slowness I | 25 % | 4 s | **Arrow hits only**, once per damaging hit. |
 | Drowned | Slowness I | 30 % | 3 s | Melee only (not thrown tridents). |
+| Vindicator (1.4.0) | Mining Fatigue I | 35 % | 6 s | Melee. |
+| Enderman (1.4.0) | Darkness | 50 % | 4 s | Melee. |
+| Wither skeleton (1.4.0) | vanilla's Wither lasts longer | 50 % | +5 s | Melee. An agreed exception to "never add to a vanilla effect": the Wither is extended (10 s becomes 15 s), never applied twice or strengthened. |
+| Blaze, ghast fireball (1.4.0) | the fireball's burn lasts longer | 50 % | +4 s | Only when the hit set the player on fire; no extra damage per second, Fire Resistance still protects. |
 | Husk, stray, bogged, witch, others | nothing added | - | - | Husks already inflict vanilla Hunger; strays and bogged shoot arrows that already carry their own effect; witches already throw potions. |
 
 Bounds: a refresh sets the duration to `max(remaining, base)` capped at `elite.effects.max-duration-seconds` (30 s), amplifiers
@@ -440,6 +444,14 @@ elite.effects.skeleton-shot-chance=0.25
 elite.effects.skeleton-shot-seconds=4
 elite.effects.drowned-chill-chance=0.30
 elite.effects.drowned-chill-seconds=3
+elite.effects.vindicator-fatigue-chance=0.35
+elite.effects.vindicator-fatigue-seconds=6
+elite.effects.enderman-darkness-chance=0.50
+elite.effects.enderman-darkness-seconds=4
+elite.effects.wither-skeleton-wither-chance=0.50
+elite.effects.wither-skeleton-wither-seconds=5
+elite.effects.fireball-burn-chance=0.50
+elite.effects.fireball-burn-seconds=4
 #easy.damage-type.minecraft.fall=0.3   # optional per-damage-type override (easy|hard|elite)
 ```
 

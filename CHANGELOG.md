@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased: Phase 8 of the 1.4.0 line (effects expansion), in progress
+
+### Added so far (the four effects chosen by the user)
+* Vindicator melee: Mining Fatigue I (35 %, 6 s). Enderman melee: Darkness (50 %, 4 s).
+* Wither skeleton melee: vanilla's own Wither lasts 5 s longer (50 %): an agreed exception to the rule of never adding to a
+  vanilla effect; the Wither is extended, never applied twice or strengthened.
+* Blaze and ghast fireballs: when the hit set the player on fire, the burn lasts 4 s longer (50 %); no extra damage per second.
+* All four only on real damage to an Elite player, capped by `elite.effects.max-duration-seconds`, each with its own chance and
+  seconds setting (`elite.effects.vindicator-fatigue-*`, `enderman-darkness-*`, `wither-skeleton-wither-*`, `fireball-burn-*`).
+
+### Tests so far
+* GameTests: each effect on a real hit (the fireball through vanilla's own fireball damage after ignition); no effect for Normal,
+  Easy, Hard or Peaceful players and vanilla's own Wither and burn unchanged for them; every duration capped by the maximum.
+  The 1.3.0 "unrelated damage" test no longer lists a vindicator melee hit as unrelated (it now has an effect).
+
 ## 1.3.1-rc.6: UNPUBLISHED development checkpoint (Phase 7 of the 1.4.0 line: spikes)
 
 > **Status: a private checkpoint, NOT published.** Builds on `1.3.1-rc.5`.
