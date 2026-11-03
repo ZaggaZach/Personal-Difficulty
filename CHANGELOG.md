@@ -7,7 +7,7 @@
 > **Phase 8 build: PASSED (3 November 2026).** `./gradlew build` green: unit tests and all 190 required GameTests. Measured:
 > Mining Fatigue 120 ticks, Wither 300 ticks (vanilla 200), fireball burn 180 ticks (vanilla 100). The live Warden test was made
 > robust in this phase (vanilla sniffing put on cooldown; it added anger at random times): anger after vibrations 1/2/3 was
-> 69/150/149 for an Elite player and 34/67/119 for a Normal one. **In-game test: pending.**
+> 69/150/149 for an Elite player and 34/67/119 for a Normal one. **In-game test: PASSED (3 November 2026, confirmed by the user).**
 
 ### Added (the four effects chosen by the user)
 * Vindicator melee: Mining Fatigue I (35 %, 6 s). Enderman melee: Darkness (50 %, 4 s).
